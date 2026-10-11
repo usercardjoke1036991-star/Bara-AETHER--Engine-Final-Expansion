@@ -5,7 +5,8 @@
       "CI (ubuntu-latest, debug)",
       "CI (ubuntu-latest, release)",
       "CI (windows-latest, debug)",
-      "CI (windows-latest, release)"
+      "CI (windows-latest, release)",
+      "Lints (clippy + rustfmt)"
     ]
   },
   "enforce_admins": true,

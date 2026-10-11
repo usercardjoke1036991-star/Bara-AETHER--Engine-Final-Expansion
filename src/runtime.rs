@@ -98,8 +98,8 @@ impl QuantumState {
         let norm = (alpha * alpha + beta * beta).sqrt();
         if norm == 0.0 {
             QuantumState::Superposition {
-                alpha: 0.707_106_78,
-                beta: 0.707_106_78,
+                alpha: std::f64::consts::FRAC_1_SQRT_2,
+                beta: std::f64::consts::FRAC_1_SQRT_2,
             }
         } else {
             QuantumState::Superposition {
@@ -1106,13 +1106,7 @@ impl BaraRuntime {
 
 /// Recorta un valor al intervalo `[0, 1]`.
 fn clamp01(x: f64) -> f64 {
-    if x < 0.0 {
-        0.0
-    } else if x > 1.0 {
-        1.0
-    } else {
-        x
-    }
+    x.clamp(0.0, 1.0)
 }
 
 /// Hash FNV-1a de 64 bits. Determinista y sin dependencias externas.

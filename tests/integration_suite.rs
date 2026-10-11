@@ -359,13 +359,13 @@ fn region_kinds_and_devices_expose_canonical_labels() {
 fn zk_field_and_polynomial_arithmetic_are_consistent() {
     // 4.1 Campo primo de Mersenne.
     assert_eq!(Fp::new(zk_proof::P), Fp::ZERO, "P ≡ 0 mod P");
-    assert_eq!(Fp::new(2).add(Fp::new(3)), Fp::new(5));
-    assert_eq!(Fp::new(7).sub(Fp::new(9)), Fp::new(zk_proof::P - 2));
-    assert_eq!(Fp::new(6).mul(Fp::new(7)), Fp::new(42));
+    assert_eq!(Fp::new(2) + Fp::new(3), Fp::new(5));
+    assert_eq!(Fp::new(7) - Fp::new(9), Fp::new(zk_proof::P - 2));
+    assert_eq!(Fp::new(6) * Fp::new(7), Fp::new(42));
     assert_eq!(Fp::new(9).pow(3), Fp::new(729));
     assert!(Fp::new(0).is_zero());
     let value = Fp::new(12_345);
-    assert_eq!(value.mul(value.inv()), Fp::ONE, "inverso de Fermat");
+    assert_eq!(value * value.inv(), Fp::ONE, "inverso de Fermat");
 
     // 4.2 Polinomios sobre 𝔽ₚ.
     let sum = Poly::constant(Fp::new(4)).add(&Poly::constant(Fp::new(5)));
@@ -661,7 +661,7 @@ fn bell_pairs_are_maximally_entangled_in_every_convention() {
 #[test]
 fn quantum_registry_bridges_entanglement_to_paraconsistent_valence() {
     let mut registry = QuantumNative::new();
-    assert!(registry.is_empty() && registry.len() == 0);
+    assert!(registry.is_empty());
     assert!(registry.bindings().is_empty() && registry.collapses() == 0);
 
     // 7.5 Un qubit puro se lee como clásico verdadero.

@@ -22,6 +22,7 @@
 
 use crate::memory_region::RegionId;
 use crate::runtime::QuantumState;
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::mpsc;
 use std::thread;
@@ -546,15 +547,17 @@ impl MeshNode {
         let mut merged = 0;
         let mut conflicts = 0;
         for incoming in &frame.entries {
-            if !self.entries.contains_key(&incoming.key) {
-                self.entries.insert(incoming.key, incoming.clone());
-                merged += 1;
-                continue;
-            }
-            if let Some(existing) = self.entries.get_mut(&incoming.key) {
-                if existing.digest != incoming.digest {
-                    existing.merge_with(incoming);
-                    conflicts += 1;
+            match self.entries.entry(incoming.key) {
+                Entry::Vacant(slot) => {
+                    slot.insert(incoming.clone());
+                    merged += 1;
+                }
+                Entry::Occupied(mut slot) => {
+                    let existing = slot.get_mut();
+                    if existing.digest != incoming.digest {
+                        existing.merge_with(incoming);
+                        conflicts += 1;
+                    }
                 }
             }
         }
@@ -958,7 +961,7 @@ impl MeshCluster {
         });
 
         let mut handles = Vec::with_capacity(peers);
-        let node_seeds: Vec<MeshNode> = self.nodes.iter().cloned().collect();
+        let node_seeds: Vec<MeshNode> = self.nodes.to_vec();
         for (id, (rx, mut node)) in inboxes.into_iter().zip(node_seeds).enumerate() {
             let announce = announce_tx.clone();
             let done = done_tx.clone();

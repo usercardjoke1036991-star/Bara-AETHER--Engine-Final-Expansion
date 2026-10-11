@@ -226,24 +226,38 @@ git switch dev
 | Job | Matriz | Comando | ¿Bloquea la fusión? |
 |---|---|---|---|
 | `CI (…, debug)` · `CI (…, release)` | `ubuntu-latest` y `windows-latest` × `debug` y `release` (4 jobs) | `cargo test --all-targets --workspace [--release] --locked` | **Sí** |
-| `Lints (clippy + rustfmt) - informativo` | `ubuntu-latest` | `cargo clippy … -- -D warnings` · `cargo fmt --all --check` | No (`continue-on-error`) |
+| `Lints (clippy + rustfmt)` | `ubuntu-latest` | `cargo clippy … -- -D warnings` (**bloqueante**) · `cargo fmt --all --check` (informativo) | **Sí** (clippy) |
 
 Política de **cero advertencias**: el *workflow* exporta `RUSTFLAGS=-D warnings`,
 así que cualquier aviso de `rustc` (en la biblioteca, en el binario o en las
 pruebas) hace fallar el job. `--locked` garantiza que se compila exactamente el
 `Cargo.lock` publicado.
 
-**Deuda técnica declarada** (para elevar `lints` a obligatorio basta con quitar
-`continue-on-error` y resolver): 9 lints de clippy — `map_entry` e
-`iter_cloned_collect` (`src/mesh_sync.rs`), `manual_div_ceil` (`src/metal_ir.rs`),
-`approx_constant` ×2 y `manual_clamp` (`src/runtime.rs`),
-`should_implement_trait` ×3 (`src/zk_proof.rs`) — más el formateo de `rustfmt`
-(el kernel usa alineación manual deliberada).
+**Estado de la puerta de calidad.** Clippy está **limpio**: los 10 lints que
+quedaban —`map_entry` e `iter_cloned_collect` (`src/mesh_sync.rs`),
+`manual_div_ceil` (`src/metal_ir.rs`), `approx_constant` ×2 y `manual_clamp`
+(`src/runtime.rs`), `should_implement_trait` ×3 (`src/zk_proof.rs`) y `len_zero`
+(`tests/integration_suite.rs`)— están resueltos (`Fp` implementa ahora
+`Add`/`Sub`/`Mul` de `std::ops`), así que el job **bloquea** la fusión.
+
+Queda una única deuda **estilística**: `cargo fmt --all --check` sigue marcando
+diferencias porque el kernel usa alineación manual deliberada (cadenas y firmas
+más anchas que los valores por defecto de `rustfmt`); por eso ese paso se ejecuta
+como informativo (`continue-on-error` a nivel de paso). Para cerrarlo:
+`cargo fmt --all`, commit del reflujo y quitar el flag del paso.
 
 ### Protección de la rama `main`
 
 Objetivo: **prohibir los push directos** a `main` y admitir sólo PR que pasen el
 CI (idealmente promociones `dev → main`).
+
+> **Aviso verificado**: la API de protección de ramas —y también la de
+> *rulesets*— responde `403 Upgrade to GitHub Pro or make this repository public
+> to enable this feature.` porque el repositorio es **privado** y la cuenta está
+> en plan **Free**. Así que `.github/main-protection.json` **no se puede aplicar
+> todavía**: hay que hacer el repositorio **público** o pasar a **GitHub Pro**.
+> Los pasos de abajo (o el comando `gh api` de la sección 5) quedan listos para
+> ese día.
 
 1. Espera a que el CI se ejecute **al menos una vez**: los nombres de los
    *status checks* sólo aparecen en la lista después de la primera ejecución.

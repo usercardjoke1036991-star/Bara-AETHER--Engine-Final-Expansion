@@ -23,6 +23,8 @@
 //! de una verificación en etapa de compilación, que es el objetivo del
 //! stub del AETHER-Ω.
 
+use std::ops::{Add, Mul, Sub};
+
 /// Módulo primo de Mersenne: `2⁶¹ − 1`.
 pub const P: u64 = 2_305_843_009_213_693_951;
 
@@ -43,21 +45,6 @@ impl Fp {
     /// Reduce un entero al campo.
     pub fn new(value: u64) -> Self {
         Fp(value % P)
-    }
-
-    /// Suma en el campo.
-    pub fn add(self, other: Fp) -> Fp {
-        Fp(((self.0 as u128 + other.0 as u128) % P as u128) as u64)
-    }
-
-    /// Resta en el campo.
-    pub fn sub(self, other: Fp) -> Fp {
-        Fp(((self.0 as u128 + P as u128 - other.0 as u128) % P as u128) as u64)
-    }
-
-    /// Producto en el campo.
-    pub fn mul(self, other: Fp) -> Fp {
-        Fp(((self.0 as u128 * other.0 as u128) % P as u128) as u64)
     }
 
     /// Exponenciación por cuadrado-y-multiplica.
@@ -82,6 +69,37 @@ impl Fp {
     /// ¿Es el cero aditivo?
     pub fn is_zero(self) -> bool {
         self.0 == 0
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Aritmética de campo con los traits estándar
+// ─────────────────────────────────────────────────────────────────────────
+
+impl Add for Fp {
+    type Output = Fp;
+
+    /// Suma en el campo.
+    fn add(self, other: Fp) -> Fp {
+        Fp(((self.0 as u128 + other.0 as u128) % P as u128) as u64)
+    }
+}
+
+impl Sub for Fp {
+    type Output = Fp;
+
+    /// Resta en el campo.
+    fn sub(self, other: Fp) -> Fp {
+        Fp(((self.0 as u128 + P as u128 - other.0 as u128) % P as u128) as u64)
+    }
+}
+
+impl Mul for Fp {
+    type Output = Fp;
+
+    /// Producto en el campo.
+    fn mul(self, other: Fp) -> Fp {
+        Fp(((self.0 as u128 * other.0 as u128) % P as u128) as u64)
     }
 }
 

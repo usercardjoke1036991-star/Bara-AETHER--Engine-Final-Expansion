@@ -65,15 +65,16 @@ jobs:
         if: matrix.profile == 'release'
         run: cargo test --all-targets --workspace --locked --release
 
-  # ── Puerta INFORMATIVA: clippy + rustfmt (deuda técnica visible) ─────────
-  #    `continue-on-error: true`: publica los diagnósticos sin bloquear la
-  #    fusión. Para convertirla en obligatoria, elimina `continue-on-error`
-  #    y resuelve los lints pendientes (ver README · Flujo de desarrollo).
+  # ── Puerta OBLIGATORIA de calidad: clippy (rustfmt aún informativo) ──────
+  #    Clippy está limpio (0 avisos) y por tanto **bloquea** la fusión.
+  #    El paso de `rustfmt` sigue siendo informativo porque el kernel usa
+  #    alineación manual deliberada; se ejecuta con `continue-on-error` a
+  #    nivel de paso. Para cerrarlo: `cargo fmt --all` y quitar ese flag
+  #    (ver README · Flujo de desarrollo).
   lints:
-    name: Lints (clippy + rustfmt) - informativo
+    name: Lints (clippy + rustfmt)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -91,5 +92,6 @@ jobs:
       - name: cargo clippy --all-targets --workspace -- -D warnings
         run: cargo clippy --all-targets --workspace --locked -- -D warnings
 
-      - name: cargo fmt --all --check
+      - name: cargo fmt --all --check (informativo)
+        continue-on-error: true
         run: cargo fmt --all --check
