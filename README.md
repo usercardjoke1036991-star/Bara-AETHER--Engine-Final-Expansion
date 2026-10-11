@@ -137,8 +137,9 @@ main ──●──────────────────────
    dev   ●──●──●──●──●──●──●──●──●──●      desarrollo activo (trabajo diario)
 ```
 
-* **`main`** — rama estable: sólo recibe cambios que pasan `cargo test` y
-  `cargo test --release` en verde.
+* **`main`** — rama estable y **protegida**: sólo recibe cambios por *pull request*
+  que pasa el CI (4 checks obligatorios) e historial lineal; sin push directo ni
+  *force push*.
 * **`dev`** — rama de integración: aquí vive el trabajo diario; cada *commit*
   mantiene el kernel compilando sin advertencias y con la suite completa en verde.
 * El remoto `origin` sirve `dev` como rama por defecto de trabajo; `main` es la
@@ -152,10 +153,10 @@ cargo test && cargo test --release
 git commit -am "…"              # o commits temáticos por módulo
 git push                        # upstream ya configurado (origin/dev)
 
-# Cuando dev está verde, se promueve a estable:
-git switch main
-git merge --no-ff dev
-git push
+# Cuando dev está verde, se promueve a estable mediante PR
+# (`main` protegida: sin push directo, CI obligatorio, historial lineal):
+gh pr create --base main --head dev --title "promoción dev → main"   # o desde la web
+gh pr merge --squash            # squash ⇒ historial lineal; exige los 4 checks verdes
 git switch dev
 ```
 
