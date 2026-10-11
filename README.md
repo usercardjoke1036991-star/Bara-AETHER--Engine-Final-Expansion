@@ -159,6 +159,66 @@ git push
 git switch dev
 ```
 
+### Integración continua (GitHub Actions)
+
+`.github/workflows/ci.yml` se dispara con `push` y `pull_request` sobre `dev` y
+`main` y ejecuta:
+
+| Job | Matriz | Comando | ¿Bloquea la fusión? |
+|---|---|---|---|
+| `CI (…, debug)` · `CI (…, release)` | `ubuntu-latest` y `windows-latest` × `debug` y `release` (4 jobs) | `cargo test --all-targets --workspace [--release] --locked` | **Sí** |
+| `Lints (clippy + rustfmt) - informativo` | `ubuntu-latest` | `cargo clippy … -- -D warnings` · `cargo fmt --all --check` | No (`continue-on-error`) |
+
+Política de **cero advertencias**: el *workflow* exporta `RUSTFLAGS=-D warnings`,
+así que cualquier aviso de `rustc` (en la biblioteca, en el binario o en las
+pruebas) hace fallar el job. `--locked` garantiza que se compila exactamente el
+`Cargo.lock` publicado.
+
+**Deuda técnica declarada** (para elevar `lints` a obligatorio basta con quitar
+`continue-on-error` y resolver): 9 lints de clippy — `map_entry` e
+`iter_cloned_collect` (`src/mesh_sync.rs`), `manual_div_ceil` (`src/metal_ir.rs`),
+`approx_constant` ×2 y `manual_clamp` (`src/runtime.rs`),
+`should_implement_trait` ×3 (`src/zk_proof.rs`) — más el formateo de `rustfmt`
+(el kernel usa alineación manual deliberada).
+
+### Protección de la rama `main`
+
+Objetivo: **prohibir los push directos** a `main` y admitir sólo PR que pasen el
+CI (idealmente promociones `dev → main`).
+
+1. Espera a que el CI se ejecute **al menos una vez**: los nombres de los
+   *status checks* sólo aparecen en la lista después de la primera ejecución.
+2. Entra en `Settings → Rules → Rulesets` (o `Settings → Branches → Add branch
+   protection rule`).
+3. *Branch name pattern*: `main`.
+4. Marca:
+   * ✅ **Require a pull request before merging** — *Required approvals*: `0`
+     (podrás fusionar tu propio PR, pero **no** hacer push directo).
+   * ✅ **Require status checks to pass before merging** + **Require branches to be
+     up to date before merging**, y selecciona los cuatro checks obligatorios:
+     `CI (ubuntu-latest, debug)`, `CI (ubuntu-latest, release)`,
+     `CI (windows-latest, debug)`, `CI (windows-latest, release)`.
+   * ✅ **Require linear history** · ✅ **Require conversation resolution**.
+   * ✅ **Do not allow bypassing the above settings** — aplica también a los
+     administradores y es lo que **realmente bloquea el push directo**.
+   * ❌ *Allow force pushes* · ❌ *Allow deletions*.
+5. Alternativa automatizada (el cuerpo JSON ya está versionado en el repo):
+
+   ```bash
+   gh auth login            # sólo la primera vez
+   gh api -X PUT \
+     repos/usercardjoke1036991-star/Bara-AETHER--Engine-Final-Expansion/branches/main/protection \
+     -H "Accept: application/vnd.github+json" \
+     --input .github/main-protection.json
+   ```
+
+   (Equivalente con `curl` y un PAT: el cuerpo es exactamente
+   `.github/main-protection.json`.)
+
+Con esto el ciclo queda blindado: `dev` como rama de trabajo con CI verde → PR
+`dev → main` con 4 checks obligatorios → fusión con historial lineal, sin push
+directo ni *force push*.
+
 ## Licencia
 
 MIT © 2026 usercardjoke1036991-star — véase el archivo [`LICENSE`](LICENSE).

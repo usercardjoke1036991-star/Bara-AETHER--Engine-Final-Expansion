@@ -1,0 +1,95 @@
+# ══════════════════════════════════════════════════════════════════════════
+#  CI · Bara (בָּרָא) / AETHER-Ω — Integración continua del kernel
+#
+#  Objetivo: ningún cambio llega a `dev` (y por tanto a `main`) sin pasar la
+#  suite completa (29 pruebas de integración + 10 de estrés) en los perfiles
+#  debug y release, en Linux y Windows, con política estricta de cero
+#  advertencias (`RUSTFLAGS = -D warnings`).
+# ══════════════════════════════════════════════════════════════════════════
+name: CI — Bara (AETHER-Ω)
+
+# 1. Disparadores: push y pull_request sobre `dev` (desarrollo activo) y
+#    `main` (rama estable). `workflow_dispatch` permite relanzarlo a mano.
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+# Cancela ejecuciones obsoletas de la misma rama/PR (ahorra minutos de runner).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Mínimo privilegio: el CI sólo necesita leer el repositorio.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  # Política de cero advertencias: cualquier `warning` de rustc es un error.
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # ── Puerta OBLIGATORIA: matriz sistema operativo × perfil ────────────────
+  test:
+    name: CI (${{ matrix.os }}, ${{ matrix.profile }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      # No abortar el resto de la matriz si una combinación falla: queremos
+      # el diagnóstico completo (Linux vs Windows, debug vs release).
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        profile: [debug, release]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar toolchain oficial de Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Caché de registros y de target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.profile }}
+
+      - name: cargo test --all-targets --workspace (perfil debug)
+        if: matrix.profile == 'debug'
+        run: cargo test --all-targets --workspace --locked
+
+      - name: cargo test --all-targets --workspace --release (perfil release)
+        if: matrix.profile == 'release'
+        run: cargo test --all-targets --workspace --locked --release
+
+  # ── Puerta INFORMATIVA: clippy + rustfmt (deuda técnica visible) ─────────
+  #    `continue-on-error: true`: publica los diagnósticos sin bloquear la
+  #    fusión. Para convertirla en obligatoria, elimina `continue-on-error`
+  #    y resuelve los lints pendientes (ver README · Flujo de desarrollo).
+  lints:
+    name: Lints (clippy + rustfmt) - informativo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar toolchain oficial de Rust (stable) con componentes
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Caché de registros y de target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ubuntu-latest-lints
+
+      - name: cargo clippy --all-targets --workspace -- -D warnings
+        run: cargo clippy --all-targets --workspace --locked -- -D warnings
+
+      - name: cargo fmt --all --check
+        run: cargo fmt --all --check
