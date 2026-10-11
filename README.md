@@ -129,7 +129,38 @@ sintetizadas.
 * El códec *wire* es bit‑exacto para estados clásicos y paraconsistentes; las
   superposiciones se **renormalizan** al decodificar.
 
+## Flujo de desarrollo
+
+```
+main ──●─────────────────────────────●──▶  rama estable (sólo fusiones verificadas)
+        \                           /
+   dev   ●──●──●──●──●──●──●──●──●──●      desarrollo activo (trabajo diario)
+```
+
+* **`main`** — rama estable: sólo recibe cambios que pasan `cargo test` y
+  `cargo test --release` en verde.
+* **`dev`** — rama de integración: aquí vive el trabajo diario; cada *commit*
+  mantiene el kernel compilando sin advertencias y con la suite completa en verde.
+* El remoto `origin` sirve `dev` como rama por defecto de trabajo; `main` es la
+  cara publicada / de referencia.
+
+Ciclo típico:
+
+```bash
+git switch dev                  # rama activa de desarrollo
+cargo test && cargo test --release
+git commit -am "…"              # o commits temáticos por módulo
+git push                        # upstream ya configurado (origin/dev)
+
+# Cuando dev está verde, se promueve a estable:
+git switch main
+git merge --no-ff dev
+git push
+git switch dev
+```
+
 ## Licencia
 
-MIT — véase `Cargo.toml`.
+MIT © 2026 usercardjoke1036991-star — véase el archivo [`LICENSE`](LICENSE).
+
 

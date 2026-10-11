@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 description = "Bara (בָּרָא) — El Lenguaje de Programación Supremo Trascendental"
 license = "MIT"
+repository = "https://github.com/usercardjoke1036991-star/Bara-AETHER--Engine-Final-Expansion"
+readme = "README.md"
 
 # El núcleo vive en `src/lib.rs` para que el binario `bara` y la suite de
 # integración (`tests/`) compartan exactamente los mismos tipos (cero duplicación
