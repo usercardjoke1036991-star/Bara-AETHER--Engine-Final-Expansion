@@ -1,3 +1,4 @@
+---
 # ══════════════════════════════════════════════════════════════════════════
 #  CI · Bara (בָּרָא) / AETHER-Ω — Integración continua del kernel
 #
@@ -10,11 +11,18 @@ name: CI — Bara (AETHER-Ω)
 
 # 1. Disparadores: push y pull_request sobre `dev` (desarrollo activo) y
 #    `main` (rama estable). `workflow_dispatch` permite relanzarlo a mano.
-on:
+#    La clave va entrecomillada a proposito: en YAML 1.1 el literal `on` se
+#    resuelve como el booleano `true` y los validadores estrictos lo marcan
+#    (regla `truthy`). Entrecomillada es texto en todas las versiones.
+"on":
   push:
-    branches: [dev, main]
+    branches:
+      - dev
+      - main
   pull_request:
-    branches: [dev, main]
+    branches:
+      - dev
+      - main
   workflow_dispatch:
 
 # Cancela ejecuciones obsoletas de la misma rama/PR (ahorra minutos de runner).
@@ -30,7 +38,9 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   # Política de cero advertencias: cualquier `warning` de rustc es un error.
-  RUSTFLAGS: -D warnings
+  # El valor va entrecomillado: empieza por `-` y asi ningun parser lo confunde
+  # con el inicio de una entrada de secuencia.
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   # ── Puerta OBLIGATORIA: matriz sistema operativo × perfil ────────────────
@@ -43,8 +53,12 @@ jobs:
       # el diagnóstico completo (Linux vs Windows, debug vs release).
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        profile: [debug, release]
+        os:
+          - ubuntu-latest
+          - windows-latest
+        profile:
+          - debug
+          - release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
