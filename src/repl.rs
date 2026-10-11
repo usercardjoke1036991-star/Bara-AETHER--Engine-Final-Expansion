@@ -352,6 +352,27 @@ pub fn natural_to_roots(text: &str) -> (String, Vec<String>, usize) {
     (program, used, synthesized)
 }
 
+/// Extrae los **turnos** de un manifiesto de texto.
+///
+/// Un manifiesto es un guion legible por humanos: se descartan las líneas
+/// vacías y los comentarios `#` —tanto de línea completa como de cola—, de modo
+/// que el documento puede documentarse en cualquier idioma sin que las notas
+/// contaminen el programa compilado.
+///
+/// Devuelve cada línea significativa ya recortada, en el orden del documento.
+pub fn manifest_lines(source: &str) -> Vec<String> {
+    let mut lines = Vec::new();
+    for raw in source.lines() {
+        let without_comment = raw.split('#').next().unwrap_or("");
+        let line = without_comment.trim();
+        if line.is_empty() {
+            continue;
+        }
+        lines.push(line.to_string());
+    }
+    lines
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // El Oráculo
 // ─────────────────────────────────────────────────────────────────────────
@@ -742,6 +763,23 @@ impl<'a> Oracle<'a> {
             }
         }
         self.report()
+    }
+
+    /// Conversa un **manifiesto** completo leyendo sus turnos del texto.
+    ///
+    /// Los comentarios `#` y las líneas vacías se descartan (véase
+    /// [`manifest_lines`]); cada turno restante se conversa en orden, con la
+    /// misma salida que [`Oracle::run_script`]. Un manifiesto vacío no es un
+    /// error: se tolera y se devuelve el informe acumulado.
+    pub fn run_manifest(&mut self, source: &str) -> OracleReport {
+        let lines = manifest_lines(source);
+        if lines.is_empty() {
+            println!("   (manifiesto vacío: nada que conversar)");
+            return self.report();
+        }
+        let script: Vec<&str> = lines.iter().map(|line| line.as_str()).collect();
+        println!("   ── manifiesto: {} turno(s) ──", script.len());
+        self.run_script(&script)
     }
 
     /// Bucle interactivo real: lee de la entrada estándar hasta `:salir` o el

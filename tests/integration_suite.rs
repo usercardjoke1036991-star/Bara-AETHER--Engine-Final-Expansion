@@ -1191,6 +1191,33 @@ fn oracle_session_compiles_conversation_and_never_panics() {
 
 
 #[test]
+fn manifest_script_drives_the_oracle_pipeline() {
+    // El manifiesto se documenta con comentarios: se descartan las líneas
+    // vacías y los `#` —de línea completa o de cola— y se conservan los
+    // operadores simbólicos puros (`!!`), que el lexer sí reconoce.
+    let lines = bara::manifest_lines(
+        "# manifiesto de prueba\r\n  ברא   # estructura\r\n\r\n  # sólo una nota\r\n!!\r\n",
+    );
+    assert_eq!(lines, vec!["ברא".to_string(), "!!".to_string()]);
+
+    let mut runtime = BaraRuntime::new();
+    {
+        let mut oracle = Oracle::new(&mut runtime);
+
+        // Un manifiesto sin turnos no es un error: se tolera con informe vacío.
+        assert_eq!(oracle.run_manifest("   \n# sólo comentarios\n").turns, 0);
+
+        // El manifiesto se conversa turno a turno sobre el runtime vivo.
+        let report = oracle.run_manifest("ברא\nברא\n:deshacer\n:estado\n");
+        assert_eq!(report.turns, 4, "cuatro líneas significativas ⇒ cuatro turnos");
+        assert_eq!(report.rollbacks, 1, "`:deshacer` emite su pulso Δ⁻¹");
+        assert!(report.roots.contains(&"ברא".to_string()));
+        assert!(report.events > 0);
+    }
+    assert_eq!(runtime.stack.len(), 1, "el rollback revirtió un turno de ברא");
+}
+
+#[test]
 fn oracle_undo_rolls_turns_back_completely() {
     let mut runtime = BaraRuntime::new();
     let report = {

@@ -49,5 +49,5 @@ pub mod zk_proof;
 
 pub use memory_region::{Device, RegionId, RegionKind};
 pub use quantum_native::{Amplitude, BellPhase};
-pub use repl::{MetaCommand, Oracle, OracleReport};
+pub use repl::{manifest_lines, MetaCommand, Oracle, OracleReport};
 pub use runtime::{BaraRuntime, ExecutionEvent, Observation, QuantumState};

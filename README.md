@@ -16,8 +16,8 @@ de explotar.
 |---|---|
 | `cargo build` (debug) | EXIT 0 · **0 advertencias** |
 | `cargo build --release` | EXIT 0 · `opt-level=3`, `lto=true`, `codegen-units=1`, `panic="abort"` |
-| `cargo test` | **39 / 39 pruebas en verde** · 0 advertencias |
-| `cargo test --release` | **39 / 39** · arnés de estrés en 0.66 s |
+| `cargo test` | **40 / 40 pruebas en verde** · 0 advertencias |
+| `cargo test --release` | **40 / 40** · arnés de estrés en 0.66 s |
 | Dependencias externas | **0** (`Cargo.lock` contiene sólo `bara`) |
 | `unsafe` | **0** (`#![forbid(unsafe_code)]` en `src/lib.rs`) |
 
@@ -28,7 +28,9 @@ de explotar.
 El *kernel* vive en `src/lib.rs` (crate `bara`) para que el binario y la suite de
 integración de `tests/` compartan **exactamente los mismos tipos** — cero
 duplicación del núcleo. `src/main.rs` es un consumidor delgado que orquesta las
-trece fases del génesis.
+trece fases del génesis, y `src/bin/bara_oracle.rs` es el **binario dedicado a la
+manifestación interactiva**: arranca el pipeline nativo y entrega el control al
+oráculo sin volcar antes todo el log del génesis.
 
 | Módulo | Líneas | Responsabilidad |
 |---|---:|---|
@@ -41,7 +43,8 @@ trece fases del génesis.
 | `src/quantum_native.rs` | 940 | **Qubits nativos** `Qubit<\|ψ⟩>`, amplitudes complejas, pares de Bell, colapso determinista |
 | `src/mesh_sync.rs` | 1057 | **Malla global holográfica**: relojes vectoriales, bus en proceso e hilos `std` |
 | `src/metal_ir.rs` | 949 | **Metal‑IR**: *layout* abstracto de registros, ISA de 32 bits y **bypass del driver** |
-| `src/repl.rs` | 790 | **Oráculo REPL**: lengua natural → programa *Shoresh*, meta‑comandos |
+| `src/repl.rs` | 828 | **Oráculo REPL**: lengua natural → programa *Shoresh*, meta‑comandos, carga de manifiestos |
+| `src/bin/bara_oracle.rs` | 331 | **Oráculo en vivo**: binario dedicado (pipeline nativo + manifiestos + bucle interactivo) |
 | `src/lib.rs` | 53 | *Crate root*: mapa de módulos, reexportaciones, invariantes |
 | `src/main.rs` | 756 | Génesis de 13 fases + bucle del oráculo |
 
@@ -79,20 +82,75 @@ cargo run --release
 # Fuerza el bucle interactivo aunque la entrada esté redirigida (CI / guiones)
 cargo run --release -- --oracle
 
-# Suite completa: 29 pruebas de integración + 10 de estrés
+# ORÁCULO EN VIVO: arranca el pipeline nativo y conversa directamente
+cargo run --release --bin bara_oracle
+
+# Conversa un manifiesto de raíces/lengua natural (sesión scriptada)
+cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
+
+# Un turno suelto, sin pipeline y sin bucle interactivo (humo de integración)
+cargo run --release --bin bara_oracle -- --bare --no-live -s "ברא שמר עבד"
+
+# El manifiesto también puede llegar por stdin (`-`)
+type manifests\shoresh_manifest.bara | cargo run --release --bin bara_oracle -- --no-live -
+
+# Suite completa: 30 pruebas de integración + 10 de estrés
 cargo test
 cargo test --release -- --nocapture
 ```
 
-El binario admite un guion por `stdin`: cada línea se interpreta como lengua
-natural o como meta‑comando del oráculo (`:estado`, `:memoria`, `:zk`,
+El binario `bara` admite un guion por `stdin`: cada línea se interpreta como
+lengua natural o como meta‑comando del oráculo (`:estado`, `:memoria`, `:zk`,
 `:cuántica`, `:deshacer`, `:salir`, …).
+
+### Oráculo en vivo (`bara_oracle`)
+
+`bara_oracle` es el punto de entrada interactivo: enciende el pipeline nativo
+(ψ · malla · Metal‑IR · ZK) y cede el control al oráculo sin imprimir antes las
+trece fases del génesis.
+
+```bash
+cargo run --release --bin bara_oracle [OPCIONES] [MANIFIESTO...]
+
+#   MANIFIESTO...        rutas a conversar en orden; `-` lee de stdin
+#   -m, --manifest RUTA  añade un manifiesto (repetible)
+#   -s, --say TEXTO      conversa un turno suelto (repetible)
+#   --bare               no enciende ψ · malla · Metal-IR · ZK
+#   --no-live            no entra en el bucle interactivo
+#   -f, --force-live     entra en el bucle aunque stdin esté redirigido
+#   -h, --help / -V, --version
+```
+
+Un **manifiesto** (`manifests/*.bara`) es texto con un turno por línea: raíces
+triconsonánticas, lengua natural o meta‑comandos. Las líneas vacías y los
+comentarios `#` (de línea completa o de cola) se descartan, así que el documento
+puede documentarse en prosa sin contaminar el programa compilado. Si el guion
+cierra con `:salir`, la sesión termina ahí (`-f` fuerza el bucle interactivo).
+
+```text
+$ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
+── PIPELINE NATIVO · ψ · MALLA · METAL-IR · ZK ───────────────
+   superposición ψ       : alef=SUPERPOSITION(|α|²=0.750, |β|²=0.250) · bet=SUPERPOSITION(|α|²=0.360, |β|²=0.640)
+   entrelazado «Φ⁺»      : PARACONSISTENT(⊤=0.500, ⊥=0.500)
+   colapso no local      : alef ⇒ CLASSICAL(true)
+   certificado ZK        : «AST-Bara-génesis» · 3 invariante(s) · verificado=true
+   Metal-IR «manifiesto.metal»: 68 instrucción(es) · anillo×128 · 68 syscalls evitadas
+   ── manifiesto: 31 turno(s) ──
+   ⋯ ברא› !!
+      ⟶ 2 evento(s) · 0 Δ reversibles · Δ⁻¹ interceptó 1 paradoja(s) · cima=PARACONSISTENT(⊤=1.000, ⊥=0.000)
+      ⇢ shoresh compilado: !!
+   ⋯ ברא› crea un mundo con luz y ordena el caos
+      ⟶ 10 evento(s) · 4 Δ reversibles · axiomas+3 · cima=PARACONSISTENT(⊤=0.530, ⊥=0.500)
+      ⇢ shoresh compilado: ברא תחא בהמ ליב
+
+   informe de la sesión: 31 turno(s) · 69 evento(s) · 2 rollback(s) · 11 axioma(s) nuevo(s) · raíces: !! ברא חכם עבד שמר שפט …
+```
 
 ## Suite de pruebas
 
 | Archivo | Líneas | Pruebas | Cobertura |
 |---|---:|---:|---|
-| `tests/integration_suite.rs` | 1309 | **29** | léxico, runtime/Belnap, memoria holográfica, autopoiesis, regiones, ZK‑SNARK, FFI, `Δ⁻¹`, cuántica/Bell, malla (bus vs hilos), códec *wire*, Metal‑IR, oráculo REPL, pipeline nativo |
+| `tests/integration_suite.rs` | 1336 | **30** | léxico, runtime/Belnap, memoria holográfica, autopoiesis, regiones, ZK‑SNARK, FFI, `Δ⁻¹`, cuántica/Bell, malla (bus vs hilos), códec *wire*, Metal‑IR, oráculo REPL, manifiestos, pipeline nativo |
 | `tests/stress_test.rs` | 569 | **10** | PRNG SplitMix64 propio: inundación de paradojas, rollback profundo, mutación masiva del AST, tormenta de memoria, fuente adversarial, tormenta de conflictos en la malla, tormenta cuántica, presión de Metal‑IR, tormenta FFI, conversación hostil del oráculo |
 
 Los *tests* enlazan el mismo *kernel* (`use bara::…`), por lo que no hay copias

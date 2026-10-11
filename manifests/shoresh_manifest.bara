@@ -1,0 +1,75 @@
+# ═══════════════════════════════════════════════════════════════════════
+#  MANIFIESTO SHORESH · Bara / AETHER-Ω
+#  Estructura: ברא   ·   Aislamiento seguro: שמר   ·   Ejecución: עבד
+# ───────────────────────────────────────────────────────────────────────
+#  Cada línea no vacía y sin `#` es un turno del oráculo. Las líneas se
+#  escriben en raíces triconsonánticas (`ברא שמר עבד`), en lengua natural
+#  («crea un mundo con luz») o como meta-comando (`:estado`). Los verbos
+#  que el léxico desconoce no son un error: se sintetizan por autopoiesis.
+#
+#  Ejecución:
+#      cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── 0 · fotografía inicial de la máquina ───────────────────────────────
+:estado
+
+# ── 1 · ESTRUCTURA · dos manifestaciones ex nihilo (ברא) ───────────────
+#  Cada ברא abre una región de génesis inmortal y escribe en la memoria
+#  holográfica de entropía cero.
+ברא
+ברא
+
+# ── 2 · superposición adaptativa (חכם) y ejecución (עבד) ───────────────
+חכם
+עבד
+
+# ── 3 · AISLAMIENTO · sellar la estructura antes de la paradoja (שמר) ──
+#  Se sella la falsedad a cero: el estado queda aislado contra la
+#  explosión lógica (ex falso quodlibet).
+שמר
+
+# ── 4 · contradicción controlada: fusión paraconsistente (⊤∧⊥) ─────────
+!!
+עבד
+שמר
+אמר
+
+# ── 5 · operadores paraconsistentes puros sobre la pila ────────────────
+#  `*` conjunción · `+` disyunción · `!` colapso forzado · `?` observación
+*
++
+!
+?
+
+# ── 6 · juicio por conjunción (שפט) y veredicto emitido (אמר) ──────────
+שפט
+אמר
+
+# ── 7 · autopoiesis: una raíz desconocida sintetiza un axioma nuevo ────
+נצח
+
+# ── 8 · el mismo ciclo en lengua natural (léxico → programa Shoresh) ───
+#  «crea» ⇒ ברא   «guarda»/«sella»/«protege» ⇒ שמר   «colapsa»/«ejecuta» ⇒ עבד
+#  «entrelaza» ⇒ !!   «juzga»/«compara» ⇒ שפט   «emite»/«muestra» ⇒ אמר
+#  «optimiza»/«adapta» ⇒ חכם   ·   lo que no está en el léxico se sintetiza.
+crea un mundo con luz y ordena el caos
+guarda el fuego con sello seguro
+entrelaza alef con bet
+colapsa el estado y muestra el veredicto
+juzga la creacion holografica
+
+# ── 9 · EJECUCIÓN · introspección del pipeline nativo ──────────────────
+:cuántica
+:malla
+:metal
+:zk
+:memoria
+:tiempo
+
+# ── 10 · rollback Δ⁻¹: rebobinar el último turno compilado ─────────────
+:deshacer
+:estado
+
+# ── 11 · cierre ordenado de la sesión ──────────────────────────────────
+:salir
