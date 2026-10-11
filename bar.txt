@@ -1,0 +1,24 @@
+Role: Lead Systems Architect & Quantum-Ontological Compiler Engineer
+Project Name: Bara (בָּרָא) - The Supreme Transcendental Programming Language
+
+### Objective
+Initialize and engineer the foundational bootstrap kernel and core engine for **Bara (בָּרָא)**, a supreme programming system that transcends traditional binary logic through triconsonantal Hebrew root semantics, paraconsistent logic structures, and autopoietic (self-evolving) runtime capabilities. 
+
+The initial codebase must be written in **Rust** for maximum performance and low-level system control, structured for local execution in our development environment.
+
+### Core Architecture Specifications to Implement:
+1. **Triconsonantal Lexer & Parser:**
+   - Build a lexical analyzer designed to parse Hebrew triconsonantal semantic roots (e.g., `ברא` for manifestation/creation, `שמר` for zero-day isolation and protection, `חכם` for adaptive heuristics) instead of standard English keywords.
+2. **Paraconsistent & Quantum State Runtime:**
+   - Implement a core data structure (`QuantumState`) capable of handling traditional boolean states, probabilistic superpositions, and paraconsistent logic (allowing the evaluation of logical contradictions without runtime crashes).
+3. **Autopoietic Mutator (Self-Evolution Engine):**
+   - Create an AST (Abstract Syntax Tree) evaluation loop that handles unknown/undefined roots not by throwing fatal compiler errors, but by triggering an axiom-synthesis routine that dynamically generates new logical rules.
+4. **Zero-Entropy Holographic Memory Stub:**
+   - Set up the foundational memory management structure optimized for topological affinity and zero thermal/computational waste.
+
+### Immediate Execution Tasks for Cline:
+- Create the initial project directory structure and Cargo configuration (`Cargo.toml`).
+- Write the primary source files (`main.rs`, `lexer.rs`, `runtime.rs`) containing the fully implemented bootstrap code for Bara.
+- Ensure the code compiles cleanly, includes comprehensive documentation within the code, and outputs a clear ontological execution log upon running the genesis program.
+
+Begin execution and construct the physical code files now.

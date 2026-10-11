@@ -1,0 +1,17 @@
+# ── Artefactos de compilación Rust ────────────────────────────────────────
+/target
+**/*.rs.bk
+*.pdb
+
+# ── Volcados y temporales de sesión de agente ─────────────────────────────
+_*.log
+_*.out
+_*.err
+_*.txt
+!bar.txt
+
+# ── Entornos / editores ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+Thumbs.db

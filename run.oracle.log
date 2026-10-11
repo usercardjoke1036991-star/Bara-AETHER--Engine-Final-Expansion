@@ -1,0 +1,392 @@
+══════════════════════════════════════════════════════════════
+  BARA  ·  בָּרָא  ·  El Lenguaje Supremo Trascendental
+  bootstrap kernel / core engine  —  versión 0.1.0
+══════════════════════════════════════════════════════════════
+
+── FASE 1 · ANÁLISIS LÉXICO TRICONSONÁNTICO ───────────────────
+   L3   C1   Root(ברא ⇒ ברא)
+   L4   C1   Root(חכם ⇒ חכם)
+   L5   C1   Root(עבד ⇒ עבד)
+   L6   C1   Root(ברא ⇒ ברא)
+   L7   C1   Root(ברא ⇒ ברא)
+   L8   C1   BangBang(!!)
+   L9   C1   Root(עבד ⇒ עבד)
+   L10  C1   Root(שמר ⇒ שמר)
+   L11  C1   Root(נצח ?)
+   L12  C1   Root(עבד ⇒ עבד)
+   L13  C1   Root(אמר ⇒ אמר)
+   L14  C1   Root(שפט ⇒ שפט)
+   L15  C1   Root(אמר ⇒ אמר)
+   → 13 tokens significativos extraídos.
+
+── FASE 2 · EJECUCIÓN ONTOLÓGICA (LOG DEL GÉNESIS) ────────────
+   [01] ⟐ léxico     raíz ברא reconocida ⇒ manifestar (creación ex nihilo)
+   [02] ❖ holograma  «genesis:1» key=0xFF3F84368D99AC78
+   [03] ▤ región     «bereshit:1» GENESIS 64 bytes (liberación estática)
+   [04] ⊕ génesis    manifestación ex nihilo ⇒ CLASSICAL(true)
+   [05] ⟐ léxico     raíz חכם reconocida ⇒ sintetizar (heurística adaptativa)
+   [06] ≈ heurística superposición adaptativa ⇒ SUPERPOSITION(|α|²=0.640, |β|²=0.360)
+   [07] ⟐ léxico     raíz עבד reconocida ⇒ ejecutar (colapso operacional)
+   [08] ⊙ colapso    SUPERPOSITION(|α|²=0.640, |β|²=0.360) ⊳ observación ⊤ (verdadero)
+   [09] ⟐ léxico     raíz ברא reconocida ⇒ manifestar (creación ex nihilo)
+   [10] ❖ holograma  «genesis:2» key=0xFF3F87368D99B191
+   [11] ▤ región     «bereshit:2» GENESIS 128 bytes (liberación estática)
+   [12] ⊕ génesis    manifestación ex nihilo ⇒ CLASSICAL(true)
+   [13] ⟐ léxico     raíz ברא reconocida ⇒ manifestar (creación ex nihilo)
+   [14] ❖ holograma  «genesis:3» key=0xFF3F86368D99AFDE
+   [15] ▤ región     «bereshit:3» GENESIS 192 bytes (liberación estática)
+   [16] ⊕ génesis    manifestación ex nihilo ⇒ CLASSICAL(true)
+   [17] ⊗ pliegue    conjunción/disyunción ⇒ PARACONSISTENT(⊤=1.000, ⊥=1.000)
+   [18] ⧗ Δ⁻¹ rollback «⊤∧⊥ absoluto: paradoja irresoluble» ⊳ 2 deltas revertidos en 46 µs
+   [19] ⟐ léxico     raíz עבד reconocida ⇒ ejecutar (colapso operacional)
+   [20] ⊙ colapso    CLASSICAL(true) ⊳ observación ⊤ (verdadero)
+   [21] ⟐ léxico     raíz שמר reconocida ⇒ guardar (aislamiento de día-cero)
+   [22] ⛨ guarda     aislamiento de día-cero (sellado=true)
+   [23] ⟐ léxico     raíz נצח desconocida ⇒ activando autopoiesis
+   [24] ✦ autopoiesis gen#1 נצח ⇒ ⟦נצח⟧ ≜ ⊤-estable : ◇x ∧ □¬x → ⊥
+   [25] ⟐ léxico     raíz עבד reconocida ⇒ ejecutar (colapso operacional)
+   [26] ⊙ colapso    PARACONSISTENT(⊤=0.830, ⊥=0.980) ⊳ observación ⊤∧⊥ (contradicción tolerada)
+   [27] ⟐ léxico     raíz אמר reconocida ⇒ emitir (enunciar el estado)
+   [28] 🗣 emisión    CLASSICAL(true)
+   [29] ⟐ léxico     raíz שפט reconocida ⇒ juzgar (evaluación lógica)
+   [30] ⊗ pliegue    conjunción/disyunción ⇒ PARACONSISTENT(⊤=1.000, ⊥=0.000)
+   [31] ⟐ léxico     raíz אמר reconocida ⇒ emitir (enunciar el estado)
+   [32] 🗣 emisión    PARACONSISTENT(⊤=1.000, ⊥=0.000)
+
+── FASE 3 · AUTOPSIA DEL NÚCLEO AUTOPOIÉTICO ──────────────────
+   generaciones autopoiéticas : 1
+   axiomas sintetizados       : 1
+      ✦ ⟦נצח⟧ ≜ ⊤-estable : ◇x ∧ □¬x → ⊥  (valencia: PARACONSISTENT(⊤=0.830, ⊥=0.980))
+   profundidad de la pila     : 4
+   estado en la cumbre        : PARACONSISTENT(⊤=1.000, ⊥=0.000)
+
+── FASE 4 · MEMORIA HOLOGRÁFICA DE ENTROPÍA CERO ──────────────
+   nodos retenidos : 5
+   escrituras      : 5
+   entropía        : 0.000000  (cero por construcción)
+   recall celda-alef ⇒ key=0x80227DF52C8D117D afinidad=0.4375 estado=CLASSICAL(true)
+   afinidad topológica alef↔bet : 0.4688
+
+── FASE 5 · TENSIÓN PARACONSISTENTE (NO-EXPLOSIÓN) ────────────
+   estado contradictorio : PARACONSISTENT(⊤=0.900, ⊥=0.900)
+   observación           : ⊤∧⊥ (contradicción tolerada)
+   ¿contradicción?       : true
+   conjunción con ⊤       : PARACONSISTENT(⊤=0.900, ⊥=0.900)
+   → el runtime NO colapsa; la contradicción es un valor lógico.
+
+── FASE 6 · INFERENCIA DE REGIONES DE MEMORIA ─────────────────
+   regiones vivas del runtime : 3
+   bytes direccionados        : 384 B
+   ✦ bereshit:1     [GENESIS]    64 B · depth=0
+   ✦ bereshit:2     [GENESIS]   128 B · depth=0
+   ✦ bereshit:3     [GENESIS]   192 B · depth=0
+   ── inferencia por rangos de vida ──
+   ⇱ region-1  [STACK]    96 B
+   ⇄ region-2  [SHARED]   384 B
+   ↳ α → region-1
+   ↳ β → region-1
+   ↳ γ → region-2
+   ↳ δ → region-2
+   ⇄ zero-copy «vista-arlef» región#0 offset=0 len=16 ⇒ CPU (sin copia)
+   ⇄ zero-copy «vista-arlef» región#0 offset=0 len=16 ⇒ GPU (sin copia)
+   → memoria determinista: sin GC, sin borrow checker, liberación estática.
+
+── FASE 7 · VERIFICACIÓN ZK-SNARK DEL AST ─────────────────────
+   declaración pública  : «AST-Bara-génesis»
+   invariantes (n)      : 4
+   entradas públicas    : 4
+   desafío Fiat–Shamir  : 0x089988262B3B3A80
+   compromisos emitidos :
+      ↳ A = 0x01571327AA3BAC38
+      ↳ B = 0xB740C2D3176ED227
+      ↳ C = 0x54108D116F806CEC
+      ↳ H = 0x66FF2ACE03CD02F0
+   ✓ Fiat–Shamir: desafío reconstruido        OK
+   ✓ Identidad A·B − C = H·Z en r             OK
+   ✓ Compromisos no degenerados               OK
+   veredicto            : AST CERTIFICADO ✓
+   prueba manipulada    : verificado=false (esperado=false)
+
+── FASE 8 · INGESTA FFI OMNÍVORA (LEGADO → SHORESH AST) ────────
+   declaraciones C ingeridas   : 4
+   funciones Python ingeridas  : 3
+   ── mapeo a raíces triconsonánticas ──
+   ⇄ shamar_domain        ⇒ raíz ופי · aridad=2 · ret=מספר · riesgo=0.25 · saneado=true
+   ⇄ bara_alloc           ⇒ raíz כיה · aridad=1 · ret=אין · riesgo=0.25 · saneado=true
+   ⇄ chakam_score         ⇒ raíz לפי · aridad=2 · ret=מספר · riesgo=0.00 · saneado=false
+   ⇄ nachash_orphan       ⇒ raíz איל · aridad=1 · ret=מספר · riesgo=0.00 · saneado=false
+   ⇄ bara_manifest        ⇒ raíz כיה · aridad=2 · ret=נעלם · riesgo=0.00 · saneado=false
+   ⇄ shamar_guard         ⇒ raíz ופי · aridad=2 · ret=נעלם · riesgo=0.00 · saneado=false
+   ⇄ nachash_eval         ⇒ raíz איל · aridad=1 · ret=נעלם · riesgo=0.60 · saneado=true
+   → 7 nodos ingeridos, 3 saneados bajo reglas paraconsistentes.
+
+── FASE 9 · NAVEGACIÓN TEMPORAL Y ROLLBACK Δ⁻¹ ────────────────
+   demostración Δ⁻¹     : 2 deltas revertidos en 5 µs
+   pila tras rollback   : 0 estado(s)
+   paradoja interceptada: ⊤∧⊥ absoluto: paradoja irresoluble
+   ── diario temporal del runtime ──
+   ⧗ #0  t=   294 µs · push CLASSICAL(true)         Δ⁻¹ ⇒ pop        [Δ⁻¹ revertido]
+   ⧗ #1  t=   382 µs · push PARACONSISTENT(⊤=1.000, ⊥=1.000) Δ⁻¹ ⇒ pop        [Δ⁻¹ revertido]
+   → el runtime rebobina a un punto consistente en vez de colapsar.
+
+── FASE 10 · TIPOS CUÁNTICOS NATIVOS (Qubit<|ψ⟩>) ─────────────
+   qubit-alef           : SUPERPOSITION(|α|²=0.750, |β|²=0.250)
+   qubit-bet            : SUPERPOSITION(|α|²=0.360, |β|²=0.640)
+      ⌬ Qubit<qubit-alef> dim=2 p=[0.750, 0.250] S=0.811 bits
+      ⌬ Qubit<qubit-bet> dim=2 p=[0.360, 0.640] S=0.943 bits
+   entrelazado «Φ⁺»      : PARACONSISTENT(⊤=0.500, ⊥=0.500) ⇒ observación ⊤∧⊥ (contradicción tolerada)
+      ¿contradicción tolerada? true · ¿el runtime colapsó? no
+   ── las cuatro convenciones de Bell ──
+      ⧉ Φ⁺ correlación total (misma dirección)    p=[0.50 0.00 0.00 0.50] traza=(0.50,0.50) ⟨Z⊗Z⟩=+1
+      ⧉ Φ⁻ antifase sobre la correlación total    p=[0.50 0.00 0.00 0.50] traza=(0.50,0.50) ⟨Z⊗Z⟩=+1
+      ⧉ Ψ⁺ anticorrelación total (direcciones opuestas) p=[0.00 0.50 0.50 0.00] traza=(0.50,0.50) ⟨Z⊗Z⟩=-1
+      ⧉ Ψ⁻ singlete: anticorrelación en todas las bases p=[0.00 0.50 0.50 0.00] traza=(0.50,0.50) ⟨Z⊗Z⟩=-1
+   puerta H sobre alef   : «qubit-alef» p=1.000 S=0.000 bits ⇒ PARACONSISTENT(⊤=0.500, ⊥=0.500)
+   fase e^{iπ/2} sobre bet: «qubit-bet» p=0.500 S=1.000 bits ⇒ PARACONSISTENT(⊤=0.500, ⊥=0.500)
+   → una puerta local no altera la traza parcial del par: la valencia del qubit entrelazado sigue siendo ⊤∧⊥.
+   qubit-gimel (dim=4)   : «qubit-gimel» p=0.250 S=2.000 bits ⇒ SUPERPOSITION(|α|²=0.500, |β|²=0.500) · entropía máxima log₂4=2 bits
+   colapso de alef       : CLASSICAL(true)
+   socio bet (no local)  : |0⟩ · entrelazado con ["qubit-alef"]
+   valencia global       : PARACONSISTENT(⊤=0.500, ⊥=0.500)
+   → 3 qubit(s) · 1 enlace(s) · 1 colapso(s) · evaluados dentro del runtime paraconsistente.
+
+── FASE 11 · MALLA GLOBAL DE MEMORIA HOLOGRÁFICA ──────────────
+   siembra + gossip      : 4 peers · 2 ronda(s) · entradas=7 · fusión=0 · conflicto=0 · obsoleto=0 · no-op=24 · 24 entregas · 2728 B wire · digest=0x82DA4913735712CA · deriva=0.0000 · convergido=true · 256 µs · vía=bus en proceso
+   divergencia inyectada : «ffi:ופי» escrita=false en peer-01 = true · deriva=0.0357 · convergido=false
+   fusión paraconsistente: 4 peers · 2 ronda(s) · entradas=7 · fusión=0 · conflicto=10 · obsoleto=0 · no-op=14 · 24 entregas · 2788 B wire · digest=0x5F58C78BDC252877 · deriva=0.0000 · convergido=true · 176 µs · vía=bus en proceso
+   estado de la malla    : convergido=true · deriva=0.0000 · hológrafo global=0x5F58C78BDC252877
+   hilos std (mpsc)      : 4 peers · 3 ronda(s) · entradas=7 · fusión=0 · conflicto=0 · obsoleto=0 · no-op=32 · 36 entregas · 4272 B wire · digest=0x5F58C78BDC252877 · deriva=0.0000 · convergido=true · 2203 µs · vía=hilos std
+   ── nodos de la malla ──
+      ⬡ peer-00 · entradas=7 · hológrafo=0x2A2E4DAF124FA9AB · reloj=(7,6,6,6) · aplicadas=0 · obsoletas=0
+      ⬡ peer-01 · entradas=7 · hológrafo=0x2A2E4DAF124FA9AB · reloj=(6,7,6,6) · aplicadas=0 · obsoletas=0
+      ⬡ peer-02 · entradas=7 · hológrafo=0x2A2E4DAF124FA9AB · reloj=(6,6,7,6) · aplicadas=0 · obsoletas=0
+      ⬡ peer-03 · entradas=7 · hológrafo=0x2A2E4DAF124FA9AB · reloj=(6,6,6,7) · aplicadas=0 · obsoletas=0
+   formato wire          : 356 B · 7 entrada(s) · decodificación íntegra=true
+   wire corrompido       : aceptado=false (esperado=false, huella inválida)
+   → el estado del todo vive en cada parte: cero sockets, cero entropía por reenvío.
+
+── FASE 12 · METAL-IR · BYPASS DEL DRIVER ─────────────────────
+   layout abstracto      : R·32 × 8B (align 8B) │ F·16 × 8B (align 8B) │ V·16 × 32B (align 32B) · enmascarado │ P·8 × 1B (align 1B) · enmascarado │ S·4 × 8B (align 8B)
+   capacidad             : 76 registros · 936 B de banco
+   «genesis.metal» · vía CPU · 15 op(s) · carriles=4 · firma: ALLOC×4 · STORE×2 · FMA×1 · XOR×1 · PRED×3 · BAR×1 · FENCE×1 · COMMIT×1 · RET×1
+      00 0x001F0840  ALLOC   v0    ⇐ [] carriles=1 ← raíz ברא ⇒ manifestar (creación ex nihilo) ⇒ R00
+      01 0x18202000  FMA     v1    ⇐ [v0] carriles=4 ← raíz חכם ⇒ sintetizar (heurística adaptativa) ⇒ V00
+      02 0x24410800  PRED    v2    ⇐ [v1] carriles=1 ← raíz עבד ⇒ ejecutar (colapso operacional) ⇒ P00
+      03 0x00620840  ALLOC   v3    ⇐ [v2] carriles=1 ← raíz ברא ⇒ manifestar (creación ex nihilo) ⇒ R00
+      04 0x00830840  ALLOC   v4    ⇐ [v3] carriles=1 ← raíz ברא ⇒ manifestar (creación ex nihilo) ⇒ R00
+      05 0x2CA40800  FENCE   v5    ⇐ [v4] carriles=1 ← fusión !! ⇒ valla de orden ⇒ S00
+      06 0x24C50800  PRED    v6    ⇐ [v5] carriles=1 ← raíz עבד ⇒ ejecutar (colapso operacional) ⇒ P00
+      07 0x28E60800  BAR     v7    ⇐ [v6] carriles=1 ← raíz שמר ⇒ guardar (aislamiento de día-cero) ⇒ S00
+      … 7 instrucción(es) más
+      descriptor=0xCA86661CB4015324 · 15 palabra(s) de 32 bits
+   «genesis.vector.metal» · vía GPU · 15 op(s) · carriles=32 · firma: ALLOC×4 · STORE×2 · FMA×1 · XOR×1 · PRED×3 · BAR×1 · FENCE×1 · COMMIT×1 · RET×1
+      00 0x001F4040  ALLOC   v0    ⇐ [] carriles=8 ← raíz ברא ⇒ manifestar (creación ex nihilo) ⇒ R00
+      01 0x1820F800  FMA     v1    ⇐ [v0] carriles=32 ← raíz חכם ⇒ sintetizar (heurística adaptativa) ⇒ V00
+      02 0x24410800  PRED    v2    ⇐ [v1] carriles=1 ← raíz עבד ⇒ ejecutar (colapso operacional) ⇒ P00
+      03 0x00624040  ALLOC   v3    ⇐ [v2] carriles=8 ← raíz ברא ⇒ manifestar (creación ex nihilo) ⇒ R00
+      … 11 instrucción(es) más
+      descriptor=0xCA94C53CEBAEEE04 · 15 palabra(s) de 32 bits
+   ── asignación de registros (linear scan) ──
+      ▦ R    7/32 registros
+      ≈ F    0/16 registros
+      ⋮⋮ V    1/16 registros
+      ⊕ P    3/8 registros
+      ⌗ S    4/4 registros
+   presión de registros  : 0.013 · 0 derrame(s) · 0 B en ranuras estáticas
+   despacho CPU          : 4 oleada(s) × 4 carril(es) · 81 ciclos · ocupación=98.7% · 3 barreras · 15 palabras · 15 syscalls evitadas
+   despacho GPU          : 1 oleada(s) × 32 carril(es) · 81 ciclos · ocupación=98.7% · 3 barreras · 15 palabras · 15 syscalls evitadas
+   ruta de bypass (CPU)  : anillo×16 · descriptor=0xCA86661CB4015324 · base_mmio=0x661CB4015000 · 15 syscalls evitadas · 0.019 ms ahorrados
+   → el AST llega al silicio sin pedir permiso al driver del sistema operativo.
+
+── FASE 13 · ORÁCULO REPL INTERACTIVO ─────────────────────────
+   guion de arranque (modo determinista):
+   ⋯ ברא› crea un mundo con luz y ordena el caos
+      ⟶ 10 evento(s) · 4 Δ reversibles · cima=PARACONSISTENT(⊤=0.530, ⊥=0.500)
+      ⇢ shoresh compilado: ברא תחא בהמ ליב
+      · intención=shoresh · 10 evento(s) · 39 µs · axiomas+3 · Δ⁻¹: 4 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=12
+   ⋯ ברא› guarda el fuego con שמר
+      ⟶ 2 evento(s) · 0 Δ reversibles · cima=PARACONSISTENT(⊤=0.530, ⊥=0.000)
+      ⇢ shoresh compilado: שמר
+      · intención=shoresh · 2 evento(s) · 41 µs · axiomas+0 · Δ⁻¹: 4 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=12
+   ⋯ ברא› entrelaza alef con bet
+      ⟶ 3 evento(s) · 1 Δ reversibles · cima=PARACONSISTENT(⊤=0.710, ⊥=0.760)
+      ⇢ shoresh compilado: !! ישנ
+      · intención=shoresh · 3 evento(s) · 29 µs · axiomas+1 · Δ⁻¹: 7 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=13
+   ⋯ ברא› !!
+      ⟶ 1 evento(s) · 0 Δ reversibles · cima=PARACONSISTENT(⊤=0.710, ⊥=1.000)
+      ⇢ shoresh compilado: !!
+      · intención=shoresh · 1 evento(s) · 16 µs · axiomas+0 · Δ⁻¹: 9 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=13
+   ⋯ ברא› colapsa el estado y muestra el veredicto
+      ⟶ 8 evento(s) · 2 Δ reversibles · cima=PARACONSISTENT(⊤=0.740, ⊥=0.540)
+      ⇢ shoresh compilado: עבד נוז אמר טנה
+      · intención=shoresh · 8 evento(s) · 29 µs · axiomas+2 · Δ⁻¹: 11 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=15
+   ⋯ ברא› :cuántica
+      ⟶ registro cuántico: 3 qubit(s) · 1 enlace(s) · 1 colapso(s)
+      ⌬ Qubit<qubit-alef> dim=2 p=[1.000, 0.000] S=0.000 bits ⇒ colapsado a |0⟩ · valencia=CLASSICAL(true)
+      ⌬ Qubit<qubit-bet> dim=2 p=[1.000, 0.000] S=0.000 bits ⇒ colapsado a |0⟩ · valencia=CLASSICAL(true)
+      ⌬ Qubit<qubit-gimel> dim=4 p=[0.250, 0.250, 0.250, 0.250] S=2.000 bits · valencia=SUPERPOSITION(|α|²=0.500, |β|²=0.500)
+      ⧉ qubit-alef ⧉ qubit-bet (Φ⁺)
+      · intención=meta:cuántica · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 11 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=15
+   ⋯ ברא› :malla
+      ⟶ malla: 4 peer(s) · época=7 · entradas=7 · hológrafo=0x5F58C78BDC252877 · convergido=true · deriva=0.0000 · wire=9788 B
+      · intención=meta:malla · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 11 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=15
+   ⋯ ברא› :metal
+      ⟶ Metal-IR «genesis.vector.metal» · vía=GPU · 15 instrucción(es) · 15 palabra(s) · ALLOC×4 · STORE×2 · FMA×1 · XOR×1 · PRED×3 · BAR×1 · FENCE×1 · COMMIT×1 · RET×1 · anillo×16 · descriptor=0xCA94C53CEBAEEE04 · base_mmio=0xC53CEBAEE000 · 15 syscalls evitadas · 0.019 ms ahorrados
+      · intención=meta:metal · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 11 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=15
+   ⋯ ברא› :tiempo
+      ⟶ diario temporal: 13 delta(s)
+      ⧗ #0  push CLASSICAL(true) · Δ⁻¹ ⇒ pop · [Δ⁻¹]
+      ⧗ #1  push PARACONSISTENT(⊤=1.000, ⊥=1.000) · Δ⁻¹ ⇒ pop · [Δ⁻¹]
+      ⧗ #2  push CLASSICAL(true) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #3  push PARACONSISTENT(⊤=0.740, ⊥=0.890) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #4  push PARACONSISTENT(⊤=0.700, ⊥=0.630) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #5  push PARACONSISTENT(⊤=0.530, ⊥=0.500) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #6  push PARACONSISTENT(⊤=0.530, ⊥=0.000) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #7  push PARACONSISTENT(⊤=0.530, ⊥=1.000) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #8  push PARACONSISTENT(⊤=0.710, ⊥=0.760) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #9  push PARACONSISTENT(⊤=0.710, ⊥=0.760) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #10 push PARACONSISTENT(⊤=0.710, ⊥=1.000) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #11 push PARACONSISTENT(⊤=0.800, ⊥=0.860) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #12 push PARACONSISTENT(⊤=0.740, ⊥=0.540) · Δ⁻¹ ⇒ pop · [vivo]
+      · intención=meta:tiempo · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 11 Δ viv@(s) · 2 revertid@(s) · 1 pulso(s) · pila=15
+   ⋯ ברא› :deshacer
+      ⟶ Δ⁻¹ rebobinó 2 delta(s) en 5 µs · pila restaurada a 13
+      · intención=meta:deshacer · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 9 Δ viv@(s) · 4 revertid@(s) · 2 pulso(s) · pila=13
+   ⋯ ברא› juzga la creación holográfica
+      ⟶ 8 evento(s) · 1 Δ reversibles · cima=PARACONSISTENT(⊤=0.930, ⊥=0.680)
+      ⇢ shoresh compilado: שפט ברא פבש
+      · intención=shoresh · 8 evento(s) · 31 µs · axiomas+1 · Δ⁻¹: 10 Δ viv@(s) · 4 revertid@(s) · 2 pulso(s) · pila=14
+   ⋯ ברא› :memoria
+      ⟶ memoria holográfica: 7 nodo(s) · escrituras=7 · entropía=0.000
+      ❖ «celda-bet» key=0x4DF84DB8C00EFDBA afinidad=0.5312 SUPERPOSITION(|α|²=0.941, |β|²=0.059)
+      ❖ «celda-alef» key=0x80227DF52C8D117D afinidad=0.4375 CLASSICAL(true)
+      ❖ «genesis:1» key=0xFF3F84368D99AC78 afinidad=0.5312 CLASSICAL(true)
+      ❖ «genesis:3» key=0xFF3F86368D99AFDE afinidad=0.5469 CLASSICAL(true)
+      ❖ «genesis:2» key=0xFF3F87368D99B191 afinidad=0.4844 CLASSICAL(true)
+      ❖ «genesis:7» key=0xFF3F8A368D99B6AA afinidad=0.6250 CLASSICAL(true)
+      ❖ «genesis:6» key=0xFF3F8B368D99B85D afinidad=0.5156 CLASSICAL(true)
+      · intención=meta:memoria · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 10 Δ viv@(s) · 4 revertid@(s) · 2 pulso(s) · pila=14
+   ⋯ ברא› :zk
+      ⟶ certificado ZK «AST-Bara-génesis» · 4 invariante(s) · verificado=true
+      · intención=meta:zk · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 10 Δ viv@(s) · 4 revertid@(s) · 2 pulso(s) · pila=14
+   ⋯ ברא› :salir
+      ⟶ sesión cerrada: el lenguaje respira, בָּרָא.
+      · intención=meta:salir · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 10 Δ viv@(s) · 4 revertid@(s) · 2 pulso(s) · pila=14
+   ── informe de la sesión ──
+   14 turno(s) · 32 evento(s) · 2 rollback(s) · 7 axioma(s) nuevo(s) · 185 µs de compilación dinámica · raíces: !! אמר בהמ ברא טנה ישנ ליב נוז עבד פבש שמר שפט תחא
+   ── terminal interactivo detectado: entrando en el oráculo en vivo ──
+   ── oráculo en vivo · escribe :ayuda o conversa en lengua natural ──
+   ⋯ ברא›       ⟶ pila=14 · memoria=7 nodo(s) (entropía=0.000) · regiones=12 (2000 B) · axiomas=8 gen#8 · qubits=3 · malla=4 peer(s) · timeline=14 Δ
+      · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 10 Δ viv@(s) · 4 revertid@(s) · 2 pulso(s) · pila=14
+   ⋯ ברא›       ⟶ 8 evento(s) · 2 Δ reversibles · cima=CLASSICAL(true)
+      ⇢ shoresh: שמר סחנ ברא
+      · 8 evento(s) · 33 µs · axiomas+1 · Δ⁻¹: 12 Δ viv@(s) · 4 revertid@(s) · 2 pulso(s) · pila=16
+   ⋯ ברא›       ⟶ diario temporal: 16 delta(s)
+      ⧗ #0  push CLASSICAL(true) · Δ⁻¹ ⇒ pop · [Δ⁻¹]
+      ⧗ #1  push PARACONSISTENT(⊤=1.000, ⊥=1.000) · Δ⁻¹ ⇒ pop · [Δ⁻¹]
+      ⧗ #2  push CLASSICAL(true) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #3  push PARACONSISTENT(⊤=0.740, ⊥=0.890) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #4  push PARACONSISTENT(⊤=0.700, ⊥=0.630) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #5  push PARACONSISTENT(⊤=0.530, ⊥=0.500) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #6  push PARACONSISTENT(⊤=0.530, ⊥=0.000) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #7  push PARACONSISTENT(⊤=0.530, ⊥=1.000) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #8  push PARACONSISTENT(⊤=0.710, ⊥=0.760) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #9  push PARACONSISTENT(⊤=0.710, ⊥=0.760) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #10 push PARACONSISTENT(⊤=0.710, ⊥=1.000) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #11 push PARACONSISTENT(⊤=0.800, ⊥=0.860) · Δ⁻¹ ⇒ pop · [Δ⁻¹]
+      ⧗ #12 push PARACONSISTENT(⊤=0.740, ⊥=0.540) · Δ⁻¹ ⇒ pop · [Δ⁻¹]
+      ⧗ #13 push PARACONSISTENT(⊤=0.930, ⊥=0.680) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #14 push PARACONSISTENT(⊤=0.860, ⊥=0.920) · Δ⁻¹ ⇒ pop · [vivo]
+      ⧗ #15 push CLASSICAL(true) · Δ⁻¹ ⇒ pop · [vivo]
+      · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 12 Δ viv@(s) · 4 revertid@(s) · 2 pulso(s) · pila=16
+   ⋯ ברא›       ⟶ Δ⁻¹ rebobinó 2 delta(s) en 4 µs · pila restaurada a 14
+      · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 10 Δ viv@(s) · 6 revertid@(s) · 3 pulso(s) · pila=14
+   ⋯ ברא›       ⟶ sesión cerrada: el lenguaje respira, בָּרָא.
+      · 0 evento(s) · 0 µs · axiomas+0 · Δ⁻¹: 10 Δ viv@(s) · 6 revertid@(s) · 3 pulso(s) · pila=14
+   sesión en vivo: 5 turno(s) · 8 evento(s) · 3 rollback(s) · 1 axioma(s) nuevo(s) · 33 µs de compilación dinámica · raíces: ברא סחנ שמר
+
+── LOG EXTENDIDO · AETHER-Ω (REGIONES · ZK · FFI · Δ⁻¹ · ψ · MALLA · METAL · ORÁCULO) ─
+   [33] 🔐 ZK-proof   certificado «AST-Bara-génesis» · 4 invariantes ⇒ verificado=true
+   [34] ▤ región     «ffi:ופי» SHARED 24 bytes (liberación estática)
+   [35] ⇄ ingesta FFI «shamar_domain» ⇒ raíz ופי · riesgo=0.25 · saneado=true
+   [36] ▤ región     «ffi:כיה» SHARED 16 bytes (liberación estática)
+   [37] ⇄ ingesta FFI «bara_alloc» ⇒ raíz כיה · riesgo=0.25 · saneado=true
+   [38] ▤ región     «ffi:לפי» SHARED 24 bytes (liberación estática)
+   [39] ⇄ ingesta FFI «chakam_score» ⇒ raíz לפי · riesgo=0.00 · saneado=false
+   [40] ▤ región     «ffi:איל» SHARED 16 bytes (liberación estática)
+   [41] ⇄ ingesta FFI «nachash_orphan» ⇒ raíz איל · riesgo=0.00 · saneado=false
+   [42] ▤ región     «ffi:כיה» SHARED 24 bytes (liberación estática)
+   [43] ⇄ ingesta FFI «bara_manifest» ⇒ raíz כיה · riesgo=0.00 · saneado=false
+   [44] ▤ región     «ffi:ופי» SHARED 24 bytes (liberación estática)
+   [45] ⇄ ingesta FFI «shamar_guard» ⇒ raíz ופי · riesgo=0.00 · saneado=false
+   [46] ▤ región     «ffi:איל» SHARED 16 bytes (liberación estática)
+   [47] ⇄ ingesta FFI «nachash_eval» ⇒ raíz איל · riesgo=0.60 · saneado=true
+   [48] ⌬ qubit      «qubit-alef» 2 estado(s) · p★=0.750 · S=0.811 bits
+   [49] ⌬ qubit      «qubit-bet» 2 estado(s) · p★=0.640 · S=0.943 bits
+   [50] ⧉ entrelaza  «qubit-alef» ⊗ «qubit-bet» Φ⁺ · ⟨Z⊗Z⟩=+1 ⇒ ⊤∧⊥ tolerado
+   [51] ◉ colapso-q  «qubit-alef» ⇒ |0⟩ (p=1.000) · Born determinista
+   [52] ⬡ malla      «peer-00» 4 peer(s) · hológrafo=0x168BC8E787D3342D · convergido=true
+   [53] ⬡ malla      «peer-01» 4 peer(s) · hológrafo=0x168BC8E787D3342D · convergido=true
+   [54] ⬡ malla      «peer-02» 4 peer(s) · hológrafo=0x168BC8E787D3342D · convergido=true
+   [55] ⬡ malla      «peer-03» 4 peer(s) · hológrafo=0x168BC8E787D3342D · convergido=true
+   [56] ⬡ malla      «peer-00» 4 peer(s) · hológrafo=0x2A2E4DAF124FA9AB · convergido=true
+   [57] ⬡ malla      «peer-01» 4 peer(s) · hológrafo=0x2A2E4DAF124FA9AB · convergido=true
+   [58] ⬡ malla      «peer-02» 4 peer(s) · hológrafo=0x2A2E4DAF124FA9AB · convergido=true
+   [59] ⬡ malla      «peer-03» 4 peer(s) · hológrafo=0x2A2E4DAF124FA9AB · convergido=true
+   [60] ⬡ malla      «peer-00» 4 peer(s) · hológrafo=0x2A2E4DAF124FA9AB · convergido=true
+   [61] ⬡ malla      «peer-01» 4 peer(s) · hológrafo=0x2A2E4DAF124FA9AB · convergido=true
+   [62] ⬡ malla      «peer-02» 4 peer(s) · hológrafo=0x2A2E4DAF124FA9AB · convergido=true
+   [63] ⬡ malla      «peer-03» 4 peer(s) · hológrafo=0x2A2E4DAF124FA9AB · convergido=true
+   [64] ⛭ metal-IR   «genesis.metal» 15 op(s) · 15 registro(s) · 0 derrame(s) · bypass del driver
+   [65] ⛭ metal-IR   «genesis.vector.metal» 15 op(s) · 15 registro(s) · 0 derrame(s) · bypass del driver
+   [66] ⟐ léxico     raíz ברא reconocida ⇒ manifestar (creación ex nihilo)
+   [67] ❖ holograma  «genesis:6» key=0xFF3F8B368D99B85D
+   [68] ▤ región     «bereshit:11» GENESIS 704 bytes (liberación estática)
+   [69] ⊕ génesis    manifestación ex nihilo ⇒ CLASSICAL(true)
+   [70] ⟐ léxico     raíz תחא desconocida ⇒ activando autopoiesis
+   [71] ✦ autopoiesis gen#2 תחא ⇒ ⟦תחא⟧ ≜ ⊤⊢⊥ metaestable : (x → y) → (¬y → ¬x)
+   [72] ⟐ léxico     raíz בהמ desconocida ⇒ activando autopoiesis
+   [73] ✦ autopoiesis gen#3 בהמ ⇒ ⟦בהמ⟧ ≜ ⊥-disolvente : (x ∧ ¬x) → x
+   [74] ⟐ léxico     raíz ליב desconocida ⇒ activando autopoiesis
+   [75] ✦ autopoiesis gen#4 ליב ⇒ ⟦ליב⟧ ≜ ⊥-disolvente : (x ∧ ¬x) → x
+   [76] 🔮 oráculo    «crea un mundo con luz y ordena el caos» ⇒ shoresh: ברא תחא בהמ ליב ⇒ 10 evento(s) · 39 µs
+   [77] ⟐ léxico     raíz שמר reconocida ⇒ guardar (aislamiento de día-cero)
+   [78] ⛨ guarda     aislamiento de día-cero (sellado=true)
+   [79] 🔮 oráculo    «guarda el fuego con שמר» ⇒ shoresh: שמר ⇒ 2 evento(s) · 41 µs
+   [80] ⊗ pliegue    conjunción/disyunción ⇒ PARACONSISTENT(⊤=0.530, ⊥=1.000)
+   [81] ⟐ léxico     raíz ישנ desconocida ⇒ activando autopoiesis
+   [82] ✦ autopoiesis gen#5 ישנ ⇒ ⟦ישנ⟧ ≜ ⊤-estable : (x → y) → (¬y → ¬x)
+   [83] 🔮 oráculo    «entrelaza alef con bet» ⇒ shoresh: !! ישנ ⇒ 3 evento(s) · 29 µs
+   [84] ⊗ pliegue    conjunción/disyunción ⇒ PARACONSISTENT(⊤=0.710, ⊥=1.000)
+   [85] 🔮 oráculo    «!!» ⇒ shoresh: !! ⇒ 1 evento(s) · 16 µs
+   [86] ⟐ léxico     raíz עבד reconocida ⇒ ejecutar (colapso operacional)
+   [87] ⊙ colapso    PARACONSISTENT(⊤=0.710, ⊥=1.000) ⊳ observación ⊤∧⊥ (contradicción tolerada)
+   [88] ⟐ léxico     raíz נוז desconocida ⇒ activando autopoiesis
+   [89] ✦ autopoiesis gen#6 נוז ⇒ ⟦נוז⟧ ≜ ⊤-estable : (x → y) → (¬y → ¬x)
+   [90] ⟐ léxico     raíz אמר reconocida ⇒ emitir (enunciar el estado)
+   [91] 🗣 emisión    PARACONSISTENT(⊤=0.800, ⊥=0.860)
+   [92] ⟐ léxico     raíz טנה desconocida ⇒ activando autopoiesis
+   [93] ✦ autopoiesis gen#7 טנה ⇒ ⟦טנה⟧ ≜ ⊤-estable : (x ∧ ¬x) → x
+   [94] 🔮 oráculo    «colapsa el estado y muestra el veredicto» ⇒ shoresh: עבד נוז אמר טנה ⇒ 8 evento(s) · 29 µs
+   [95] ⧗ Δ⁻¹ rollback «oráculo: Δ⁻¹ manual al marcador #11» ⊳ 2 deltas revertidos en 5 µs
+   [96] ⟐ léxico     raíz שפט reconocida ⇒ juzgar (evaluación lógica)
+   [97] ⊗ pliegue    conjunción/disyunción ⇒ PARACONSISTENT(⊤=0.530, ⊥=1.000)
+   [98] ⟐ léxico     raíz ברא reconocida ⇒ manifestar (creación ex nihilo)
+   [99] ❖ holograma  «genesis:7» key=0xFF3F8A368D99B6AA
+   [100] ▤ región     «bereshit:12» GENESIS 768 bytes (liberación estática)
+   [101] ⊕ génesis    manifestación ex nihilo ⇒ CLASSICAL(true)
+   [102] ⟐ léxico     raíz פבש desconocida ⇒ activando autopoiesis
+   [103] ✦ autopoiesis gen#8 פבש ⇒ ⟦פבש⟧ ≜ ⊥-disolvente : ◇x ∧ □¬x → ⊥
+   [104] 🔮 oráculo    «juzga la creación holográfica» ⇒ shoresh: שפט ברא פבש ⇒ 8 evento(s) · 31 µs
+   [105] ⟐ léxico     raíz שמר reconocida ⇒ guardar (aislamiento de día-cero)
+   [106] ⛨ guarda     aislamiento de día-cero (sellado=true)
+   [107] ⟐ léxico     raíz סחנ desconocida ⇒ activando autopoiesis
+   [108] ✦ autopoiesis gen#9 סחנ ⇒ ⟦סחנ⟧ ≜ ⊤-estable : (x → y) → (¬y → ¬x)
+   [109] ⟐ léxico     raíz ברא reconocida ⇒ manifestar (creación ex nihilo)
+   [110] ❖ holograma  «genesis:8» key=0xFF3F7D368D99A093
+   [111] ▤ región     «bereshit:13» GENESIS 832 bytes (liberación estática)
+   [112] ⊕ génesis    manifestación ex nihilo ⇒ CLASSICAL(true)
+   [113] 🔮 oráculo    «guarda el fuego y crea luz» ⇒ shoresh: שמר סחנ ברא ⇒ 8 evento(s) · 33 µs
+   [114] ⧗ Δ⁻¹ rollback «oráculo: Δ⁻¹ manual al marcador #14» ⊳ 2 deltas revertidos en 4 µs
+
+✦ Génesis completado. El lenguaje respira: בָּרָא.

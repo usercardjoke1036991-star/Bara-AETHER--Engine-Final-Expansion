@@ -1,0 +1,32 @@
+[package]
+name = "bara"
+version = "0.1.0"
+edition = "2021"
+description = "Bara (בָּרָא) — El Lenguaje de Programación Supremo Trascendental"
+license = "MIT"
+
+# El núcleo vive en `src/lib.rs` para que el binario `bara` y la suite de
+# integración (`tests/`) compartan exactamente los mismos tipos (cero duplicación
+# del kernel).
+[lib]
+name = "bara"
+path = "src/lib.rs"
+
+[dependencies]
+
+# ─────────────────────────────────────────────────────────────────────────
+# Perfil de release — máximo rendimiento nativo (AETHER-Ω)
+# ─────────────────────────────────────────────────────────────────────────
+# * `opt-level = 3`  — optimización agresiva (vectorización, inlining).
+# * `lto = true`     — *link-time optimization*: el AST, el runtime y la malla
+#                      se compilan como una única unidad de traducción.
+# * `codegen-units = 1` — elimina barreras de optimización entre unidades.
+# * `panic = "abort"`   — el kernel es total y TOLERANTE (jamás entra en pánico);
+#                      abortar en vez de desenrollar recorta el *prologue* y
+#                      habilita optimizaciones que dependen de `nounwind`.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
