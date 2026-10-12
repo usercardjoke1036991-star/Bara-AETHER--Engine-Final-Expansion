@@ -160,7 +160,11 @@ fn core_phase(runtime: &BaraRuntime) {
         runtime.mutator.axioms().count()
     );
     for axiom in runtime.mutator.axioms() {
-        println!("      ✦ {}  (valencia: {})", axiom.rule, axiom.valence.label());
+        println!(
+            "      ✦ {}  (valencia: {})",
+            axiom.rule,
+            axiom.valence.label()
+        );
     }
     println!("   profundidad de la pila     : {}", runtime.stack.len());
     println!(
@@ -321,7 +325,10 @@ fn zk_phase(runtime: &mut BaraRuntime) {
     println!("\n── FASE 7 · VERIFICACIÓN ZK-SNARK DEL AST ─────────────────────");
     let certificate = runtime.certify();
 
-    println!("   declaración pública  : «{}»", certificate.statement.label);
+    println!(
+        "   declaración pública  : «{}»",
+        certificate.statement.label
+    );
     println!(
         "   invariantes (n)      : {}",
         certificate.statement.n_constraints
@@ -429,7 +436,10 @@ fn temporal_phase(runtime: &mut BaraRuntime) {
         "   demostración Δ⁻¹     : {} deltas revertidos en {} µs",
         report.reverted, report.micros
     );
-    println!("   pila tras rollback   : {} estado(s)", engine.stack().len());
+    println!(
+        "   pila tras rollback   : {} estado(s)",
+        engine.stack().len()
+    );
     println!(
         "   paradoja interceptada: {}",
         report.paradox.as_deref().unwrap_or("<ninguna>")
@@ -459,7 +469,9 @@ fn temporal_phase(runtime: &mut BaraRuntime) {
 
 /// Log extendido: eventos emitidos por los módulos de las fases 2 y 3.
 fn extended_log_phase(runtime: &BaraRuntime, base: usize) {
-    println!("\n── LOG EXTENDIDO · AETHER-Ω (REGIONES · ZK · FFI · Δ⁻¹ · ψ · MALLA · METAL · ORÁCULO) ─");
+    println!(
+        "\n── LOG EXTENDIDO · AETHER-Ω (REGIONES · ZK · FFI · Δ⁻¹ · ψ · MALLA · METAL · ORÁCULO) ─"
+    );
     let mut count = 0;
     for (idx, event) in runtime.log().iter().enumerate().skip(base) {
         count += 1;
@@ -480,11 +492,7 @@ fn quantum_native_phase(runtime: &mut BaraRuntime) {
         Amplitude::real(3.0_f64.sqrt() / 2.0),
         Amplitude::from_polar(0.5, std::f64::consts::FRAC_PI_2),
     );
-    let bet = runtime.superpose_native(
-        "qubit-bet",
-        Amplitude::real(0.6),
-        Amplitude::real(0.8),
-    );
+    let bet = runtime.superpose_native("qubit-bet", Amplitude::real(0.6), Amplitude::real(0.8));
     println!("   qubit-alef           : {}", alef.label());
     println!("   qubit-bet            : {}", bet.label());
     for name in ["qubit-alef", "qubit-bet"] {
@@ -530,7 +538,10 @@ fn quantum_native_phase(runtime: &mut BaraRuntime) {
     if let Some(rotated) = runtime.qubits.hadamard("qubit-alef") {
         println!("   puerta H sobre alef   : {}", rotated.label());
     }
-    if let Some(fased) = runtime.qubits.phase_shift("qubit-bet", std::f64::consts::FRAC_PI_2) {
+    if let Some(fased) = runtime
+        .qubits
+        .phase_shift("qubit-bet", std::f64::consts::FRAC_PI_2)
+    {
         println!("   fase e^{{iπ/2}} sobre bet: {}", fased.label());
     }
     println!(
@@ -581,9 +592,10 @@ fn mesh_phase(runtime: &mut BaraRuntime) {
         .first()
         .and_then(|node| node.entries().next().map(|e| (e.name.clone(), e.region)));
     if let Some((name, region)) = target {
-        let injected = runtime
-            .mesh
-            .diverge(PeerId(1), &name, region, QuantumState::classical(false));
+        let injected =
+            runtime
+                .mesh
+                .diverge(PeerId(1), &name, region, QuantumState::classical(false));
         println!(
             "   divergencia inyectada : «{}» escrita=false en peer-01 = {} · deriva={:.4} · convergido={}",
             name,
@@ -641,7 +653,9 @@ fn mesh_phase(runtime: &mut BaraRuntime) {
             bara::mesh_sync::MeshFrame::from_wire(&corrupted).is_some()
         );
     }
-    println!("   → el estado del todo vive en cada parte: cero sockets, cero entropía por reenvío.");
+    println!(
+        "   → el estado del todo vive en cada parte: cero sockets, cero entropía por reenvío."
+    );
 }
 
 /// Imprime las primeras instrucciones de un programa Metal-IR.
@@ -675,7 +689,10 @@ fn print_metal_program(program: &MetalProgram, limit: usize) {
 /// FASE 12 — Metal-IR y bypass del driver.
 fn metal_phase(runtime: &mut BaraRuntime, tokens: &[Token]) {
     println!("\n── FASE 12 · METAL-IR · BYPASS DEL DRIVER ─────────────────────");
-    let banks: Vec<String> = bara::metal_ir::LAYOUT.iter().map(|bank| bank.label()).collect();
+    let banks: Vec<String> = bara::metal_ir::LAYOUT
+        .iter()
+        .map(|bank| bank.label())
+        .collect();
     println!("   layout abstracto      : {}", banks.join(" │ "));
     println!(
         "   capacidad             : {} registros · {} B de banco",
@@ -707,9 +724,7 @@ fn metal_phase(runtime: &mut BaraRuntime, tokens: &[Token]) {
     println!("   despacho CPU          : {}", cpu.dispatch().label());
     println!("   despacho GPU          : {}", gpu.dispatch().label());
     println!("   ruta de bypass (CPU)  : {}", cpu.bypass.label());
-    println!(
-        "   → el AST llega al silicio sin pedir permiso al driver del sistema operativo."
-    );
+    println!("   → el AST llega al silicio sin pedir permiso al driver del sistema operativo.");
 }
 
 /// FASE 13 — oráculo REPL interactivo.
@@ -752,5 +767,3 @@ fn oracle_phase(runtime: &mut BaraRuntime, force_oracle: bool) {
         );
     }
 }
-
-

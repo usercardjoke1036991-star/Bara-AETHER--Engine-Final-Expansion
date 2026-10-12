@@ -192,6 +192,10 @@ pub struct OracleTurn {
     /// Eventos ontológicos emitidos.
     pub events: usize,
     /// Duración de la compilación dinámica, en microsegundos.
+    ///
+    /// **NO DETERMINISTA** (matiz de A7): métrica de reloj de pared
+    /// (`Instant::now()`); es informativa y no participa en comparaciones ni
+    /// en la firma de una sesión.
     pub micros: u128,
     /// Axiomas nacidos por autopoiesis durante el turno.
     pub axioms: usize,
@@ -227,6 +231,9 @@ pub struct OracleReport {
     /// Axiomas sintetizados durante la sesión.
     pub synthesized: usize,
     /// Tiempo total de compilación dinámica, en microsegundos.
+    ///
+    /// **NO DETERMINISTA** (matiz de A7): suma de métricas de reloj de pared;
+    /// informativa, nunca comparable ni serializable como estado.
     pub micros: u128,
     /// Raíces tocadas durante la sesión.
     pub roots: Vec<String>,
@@ -440,7 +447,14 @@ impl<'a> Oracle<'a> {
 
     /// Conversa un turno completo: interpreta, compila al instante y
     /// monitoriza el rebobinado temporal.
-    pub fn converse(&mut self, input: &str) -> &OracleTurn {
+    ///
+    /// Devuelve el turno recién registrado. Las tres ramas del intérprete
+    /// (`Empty`, `Meta` y `Roots`) apilan **exactamente un** turno, de modo
+    /// que hoy la respuesta es siempre `Some`; aun así el contrato expone
+    /// `Option` para que ni un refactor futuro pueda abortar el proceso: el
+    /// llamante degrada al *silencio fértil* en lugar de entrar en pánico
+    /// (A1 · totalidad).
+    pub fn converse(&mut self, input: &str) -> Option<&OracleTurn> {
         let intent = self.interpret(input);
         match &intent {
             Intent::Empty => {
@@ -543,9 +557,10 @@ impl<'a> Oracle<'a> {
                 });
             }
         }
-        self.turns
-            .last()
-            .expect("el turno acaba de ser registrado")
+        // Sin `expect()`: la ausencia de turno (hoy inalcanzable, porque las
+        // tres ramas de arriba apilan uno) viaja como `None` hasta el llamante
+        // y allí se tolera; el kernel nunca aborta.
+        self.turns.last()
     }
 
     /// Estado del monitor temporal `Δ⁻¹`.
@@ -748,7 +763,17 @@ impl<'a> Oracle<'a> {
     /// Conversa un guion completo (modo determinista, sin terminal).
     pub fn run_script(&mut self, script: &[&str]) -> OracleReport {
         for input in script {
-            let turn = self.converse(input).clone();
+            // El turno siempre queda registrado (véase [`Oracle::converse`]);
+            // si alguna vez no lo estuviera, el guion degrada con un aviso en
+            // vez de abortar (A1 · tolerancia total).
+            let turn = match self.converse(input) {
+                Some(turn) => turn.clone(),
+                None => {
+                    println!("   ⋯ ברא› {input}");
+                    println!("      ⟶ ⟅ silencio fértil: turno no registrado ⟆");
+                    continue;
+                }
+            };
             println!("   ⋯ ברא› {}", turn.input);
             println!("      ⟶ {}", turn.reply);
             if !turn.roots.is_empty() {
@@ -805,7 +830,13 @@ impl<'a> Oracle<'a> {
                 }
             }
 
-            let turn = self.converse(&line).clone();
+            let turn = match self.converse(&line) {
+                Some(turn) => turn.clone(),
+                None => {
+                    println!("      ⟶ ⟅ silencio fértil: turno no registrado ⟆");
+                    continue;
+                }
+            };
             println!("      ⟶ {}", turn.reply);
             if !turn.roots.is_empty() {
                 println!("      ⇢ shoresh: {}", turn.roots);

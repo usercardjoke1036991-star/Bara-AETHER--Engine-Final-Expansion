@@ -3,8 +3,8 @@
 #  CI · Bara (בָּרָא) / AETHER-Ω — Integración continua del kernel
 #
 #  Objetivo: ningún cambio llega a `dev` (y por tanto a `main`) sin pasar la
-#  suite completa (29 pruebas de integración + 10 de estrés) en los perfiles
-#  debug y release, en Linux y Windows, con política estricta de cero
+#  suite completa (30 pruebas de integración + 10 de estrés = 40) en los
+#  perfiles debug y release, en Linux y Windows, con política estricta de cero
 #  advertencias (`RUSTFLAGS = -D warnings`).
 # ══════════════════════════════════════════════════════════════════════════
 name: CI — Bara (AETHER-Ω)
@@ -79,14 +79,19 @@ jobs:
         if: matrix.profile == 'release'
         run: cargo test --all-targets --workspace --locked --release
 
-  # ── Puerta OBLIGATORIA de calidad: clippy (rustfmt aún informativo) ──────
-  #    Clippy está limpio (0 avisos) y por tanto **bloquea** la fusión.
-  #    El paso de `rustfmt` sigue siendo informativo porque el kernel usa
-  #    alineación manual deliberada; se ejecuta con `continue-on-error` a
-  #    nivel de paso. Para cerrarlo: `cargo fmt --all` y quitar ese flag
-  #    (ver README · Flujo de desarrollo).
+  # ── Puerta OBLIGATORIA de calidad: clippy + totalidad + rustfmt + perfiles
+  #    Los cuatro pasos **bloquean** la fusión:
+  #      · clippy    — 0 avisos con `-D warnings`.
+  #      · totalidad — `src/` sin `expect()` ni `unwrap()`: el kernel es total
+  #                    y tolerante, jamás aborta (axioma A1).
+  #      · rustfmt   — el reflujo de `cargo fmt` ya está asentado, así que la
+  #                    comprobación dejó de ser informativa.
+  #      · perfiles  — el perfil release del kernel vive en
+  #                    `.cargo/config.toml` (véase scripts/check_profiles.ps1);
+  #                    este paso impide que se degrade a los valores por
+  #                    defecto (LTO desactivado, `panic` unwind).
   lints:
-    name: Lints (clippy + rustfmt)
+    name: Lints (clippy + totalidad + rustfmt + perfiles)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -106,6 +111,17 @@ jobs:
       - name: cargo clippy --all-targets --workspace -- -D warnings
         run: cargo clippy --all-targets --workspace --locked -- -D warnings
 
-      - name: cargo fmt --all --check (informativo)
-        continue-on-error: true
+      - name: Totalidad estática (A1 · sin expect() ni unwrap() en src/)
+        run: |
+          if grep -rn --include='*.rs' -E '\.expect\(|\.unwrap\(' src/; then
+            echo '::error::aparecio expect()/unwrap() en src/ — A1 exige totalidad sin excepciones'
+            exit 1
+          fi
+          echo 'OK: src/ sin expect() ni unwrap(); el kernel no puede abortar.'
+
+      - name: cargo fmt --all --check (bloqueante)
         run: cargo fmt --all --check
+
+      - name: Perfil release del kernel (scripts/check_profiles.ps1)
+        shell: pwsh
+        run: ./scripts/check_profiles.ps1

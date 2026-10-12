@@ -291,9 +291,11 @@ impl ConstraintSystem {
         let seed = if invariants.is_empty() {
             0x9E37_79B9_7F4A_7C15
         } else {
-            invariants.iter().fold(0xcbf2_9ce4_8422_2325u64, |acc, inv| {
-                acc ^ fnv1a(inv.as_bytes())
-            })
+            invariants
+                .iter()
+                .fold(0xcbf2_9ce4_8422_2325u64, |acc, inv| {
+                    acc ^ fnv1a(inv.as_bytes())
+                })
         };
 
         let len = n_constraints + 1;
@@ -314,7 +316,10 @@ impl ConstraintSystem {
 
     /// Deriva el enunciado público asociado a un conjunto de invariantes.
     pub fn statement(&self, label: &str, invariants: &[String]) -> Statement {
-        let mut public_inputs: Vec<Fp> = invariants.iter().map(|inv| Fp::new(fnv1a(inv.as_bytes()))).collect();
+        let mut public_inputs: Vec<Fp> = invariants
+            .iter()
+            .map(|inv| Fp::new(fnv1a(inv.as_bytes())))
+            .collect();
         if public_inputs.is_empty() {
             public_inputs.push(Fp::new(fnv1a(label.as_bytes())));
         }
@@ -426,14 +431,14 @@ pub fn verify(statement: &Statement, proof: &Proof) -> VerifyResult {
     let identity_ok = lhs == rhs;
 
     // 3 — Compromisos presentes y bien formados.
-    let commitments_ok = proof.commitments.len() == 4
-        && proof
-            .commitments
-            .iter()
-            .all(|(name, _)| !name.is_empty());
+    let commitments_ok =
+        proof.commitments.len() == 4 && proof.commitments.iter().all(|(name, _)| !name.is_empty());
 
     let checks = vec![
-        ("Fiat–Shamir: desafío reconstruido".to_string(), fiat_shamir_ok),
+        (
+            "Fiat–Shamir: desafío reconstruido".to_string(),
+            fiat_shamir_ok,
+        ),
         ("Identidad A·B − C = H·Z en r".to_string(), identity_ok),
         ("Compromisos no degenerados".to_string(), commitments_ok),
     ];

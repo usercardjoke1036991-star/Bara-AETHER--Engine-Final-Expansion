@@ -53,6 +53,10 @@ pub struct Delta {
     /// Identificador monótono.
     pub id: u64,
     /// Marca temporal en microsegundos desde el inicio del motor.
+    ///
+    /// **NO DETERMINISTA** (matiz de A7): reloj de pared, no estado lógico. El
+    /// diario no es reproducible *bit a bit* por este campo; ningún otro valor
+    /// (colapso, valencia, huella FNV‑1a, digest de malla) depende de él.
     pub at_micros: u128,
     /// Etiqueta descriptiva de la operación.
     pub label: String,
@@ -75,6 +79,9 @@ pub struct RollbackReport {
     /// Número de deltas revertidos.
     pub reverted: usize,
     /// Duración del rollback en microsegundos.
+    ///
+    /// **NO DETERMINISTA** (matiz de A7): métrica de reloj de pared; no
+    /// interviene en la atomicidad ni en la reversibilidad del `Δ⁻¹`.
     pub micros: u128,
     /// Paradoja que motivó el rollback, si la hubo.
     pub paradox: Option<String>,
@@ -108,6 +115,8 @@ pub fn detect_paradox(state: &QuantumState) -> Option<Paradox> {
 /// Motor de navegación temporal: pila de estados + diario de deltas.
 #[derive(Debug, Clone)]
 pub struct TemporalEngine {
+    /// Origen del reloj de pared (`Instant::now()`) del que derivan las marcas
+    /// **NO DETERMINISTAS** `Delta.at_micros` y `RollbackReport.micros`.
     epoch: Instant,
     stack: Vec<QuantumState>,
     deltas: Vec<Delta>,

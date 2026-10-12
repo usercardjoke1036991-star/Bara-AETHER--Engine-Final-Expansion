@@ -502,12 +502,7 @@ impl MeshNode {
     }
 
     /// Escribe una entrada. Devuelve `(clave, ¿cambió?)`.
-    pub fn insert(
-        &mut self,
-        name: &str,
-        region: RegionId,
-        state: QuantumState,
-    ) -> (u64, bool) {
+    pub fn insert(&mut self, name: &str, region: RegionId, state: QuantumState) -> (u64, bool) {
         let candidate = MeshEntry::new(name, region, state, self.epoch);
         if let Some(existing) = self.entries.get(&candidate.key) {
             if existing.matches(&candidate) {
@@ -708,6 +703,10 @@ pub struct SyncReport {
     /// Fracción de entradas en desacuerdo con la mayoría, en `[0,1]`.
     pub drift: f64,
     /// Duración de la sincronización en microsegundos.
+    ///
+    /// **NO DETERMINISTA** (matiz de A7): métrica de reloj de pared tomada con
+    /// `Instant::now()`; cambia en cada ejecución, así que queda fuera de
+    /// cualquier comparación, serialización, huella o firma.
     pub micros: u128,
     /// `true` si se usaron hilos obreros (`std::thread` + `mpsc`).
     pub threaded: bool,
@@ -797,12 +796,7 @@ impl MeshCluster {
     }
 
     /// Siembra una región en **todos** los nodos (condición inicial común).
-    pub fn seed(
-        &mut self,
-        name: &str,
-        region: RegionId,
-        state: QuantumState,
-    ) -> (PeerId, u64) {
+    pub fn seed(&mut self, name: &str, region: RegionId, state: QuantumState) -> (PeerId, u64) {
         let mut key = 0;
         for node in self.nodes.iter_mut() {
             let (k, _) = node.insert(name, region, state.clone());
@@ -828,17 +822,16 @@ impl MeshCluster {
     /// Huella holográfica global: `XOR` de las huellas de cada nodo, mezcladas
     /// con su índice para que nodos idénticos **no se cancelen** entre sí.
     pub fn hologram(&self) -> u64 {
-        self.nodes
-            .iter()
-            .fold(0_u64, |acc, node| acc ^ mix64(node.hologram(), node.id as u64))
+        self.nodes.iter().fold(0_u64, |acc, node| {
+            acc ^ mix64(node.hologram(), node.id as u64)
+        })
     }
 
     /// ¿Todos los nodos comparten la misma huella (y hay contenido)?
     pub fn converged(&self) -> bool {
         match self.nodes.first() {
             Some(first) => {
-                !first.is_empty()
-                    && self.nodes.iter().all(|n| n.hologram() == first.hologram())
+                !first.is_empty() && self.nodes.iter().all(|n| n.hologram() == first.hologram())
             }
             None => false,
         }

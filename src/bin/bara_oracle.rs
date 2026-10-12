@@ -175,8 +175,12 @@ fn main() {
     let report = {
         let mut oracle = Oracle::new(&mut runtime);
         for text in &cli.says {
-            let turn = oracle.converse(text).clone();
-            print_turn(&turn);
+            // El turno siempre queda registrado (véase [`Oracle::converse`]);
+            // si no lo estuviera, la sesión tolera el silencio y continúa.
+            match oracle.converse(text) {
+                Some(turn) => print_turn(turn),
+                None => println!("   ⟅ silencio fértil: turno no registrado ⟆ (tolerado)"),
+            }
         }
         for source in &manifests {
             oracle.run_manifest(source);

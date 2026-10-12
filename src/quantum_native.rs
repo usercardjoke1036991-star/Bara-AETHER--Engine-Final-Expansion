@@ -203,7 +203,11 @@ impl AmplitudeVector {
 
     /// Norma euclídea del vector.
     pub fn norm(&self) -> f64 {
-        self.amplitudes.iter().map(|a| a.norm_sqr()).sum::<f64>().sqrt()
+        self.amplitudes
+            .iter()
+            .map(|a| a.norm_sqr())
+            .sum::<f64>()
+            .sqrt()
     }
 
     /// Devuelve una copia normalizada. Si el vector es degenerado se sustituye
@@ -214,7 +218,11 @@ impl AmplitudeVector {
             return AmplitudeVector::uniform(self.dim());
         }
         AmplitudeVector {
-            amplitudes: self.amplitudes.iter().map(|a| a.scale(1.0 / norm)).collect(),
+            amplitudes: self
+                .amplitudes
+                .iter()
+                .map(|a| a.scale(1.0 / norm))
+                .collect(),
         }
     }
 
@@ -225,7 +233,10 @@ impl AmplitudeVector {
 
     /// Amplitud en un índice (cero si está fuera de rango).
     pub fn amplitude_of(&self, index: usize) -> Amplitude {
-        self.amplitudes.get(index).copied().unwrap_or(Amplitude::ZERO)
+        self.amplitudes
+            .get(index)
+            .copied()
+            .unwrap_or(Amplitude::ZERO)
     }
 
     /// Entropía de Shannon de la distribución, en bits.
@@ -732,19 +743,23 @@ impl QuantumNative {
     pub fn materialize(&mut self, name: &str, amplitudes: AmplitudeVector) -> QuantumEvaluation {
         self.qubits
             .insert(name.to_string(), Qubit::new(name, amplitudes));
-        self.evaluate(name)
-            .unwrap_or_else(|| QuantumEvaluation {
-                name: name.to_string(),
-                valence: QuantumState::classical(false),
-                measured: None,
-                probability: 0.0,
-                entropy_bits: 0.0,
-                nonlocal: Vec::new(),
-            })
+        self.evaluate(name).unwrap_or_else(|| QuantumEvaluation {
+            name: name.to_string(),
+            valence: QuantumState::classical(false),
+            measured: None,
+            probability: 0.0,
+            entropy_bits: 0.0,
+            nonlocal: Vec::new(),
+        })
     }
 
     /// Materializa un qubit en superposición `α|⊤⟩ + β|⊥⟩`.
-    pub fn superpose(&mut self, name: &str, alpha: Amplitude, beta: Amplitude) -> QuantumEvaluation {
+    pub fn superpose(
+        &mut self,
+        name: &str,
+        alpha: Amplitude,
+        beta: Amplitude,
+    ) -> QuantumEvaluation {
         self.materialize(name, AmplitudeVector::new(vec![alpha, beta]))
     }
 

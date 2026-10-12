@@ -17,7 +17,7 @@ de explotar.
 | `cargo build` (debug) | EXIT 0 · **0 advertencias** |
 | `cargo build --release` | EXIT 0 · `opt-level=3`, `lto=true`, `codegen-units=1`, `panic="abort"` |
 | `cargo test` | **40 / 40 pruebas en verde** · 0 advertencias |
-| `cargo test --release` | **40 / 40** · arnés de estrés en 0.66 s |
+| `cargo test --release` | **40 / 40** · integración 0.16 s + estrés 1.03 s |
 | Dependencias externas | **0** (`Cargo.lock` contiene sólo `bara`) |
 | `unsafe` | **0** (`#![forbid(unsafe_code)]` en `src/lib.rs`) |
 
@@ -34,19 +34,19 @@ oráculo sin volcar antes todo el log del génesis.
 
 | Módulo | Líneas | Responsabilidad |
 |---|---:|---|
-| `src/lexer.rs` | 391 | Análisis léxico **triconsonántico** total: raíces, *nikud* plegado, `!!` (fusión), invariante ante entradas hostiles |
-| `src/runtime.rs` | 1143 | Evaluador **Belnap** (`⊤ ⊥ f t`), **autopoiesis** (axiogénesis de raíces desconocidas), **memoria holográfica de entropía 0**, log ontológico, rollback integrado |
+| `src/lexer.rs` | 388 | Análisis léxico **triconsonántico** total: raíces, *nikud* plegado, `!!` (fusión), invariante ante entradas hostiles |
+| `src/runtime.rs` | 1131 | Evaluador **Belnap** (`⊤ ⊥ f t`), **autopoiesis** (axiogénesis de raíces desconocidas), **memoria holográfica de entropía 0**, log ontológico, rollback integrado |
 | `src/memory_region.rs` | 290 | Inferencia de **regiones por rangos de vida** (*lifetimes*) y vistas **zero‑copy** CPU/GPU |
-| `src/zk_proof.rs` | 459 | Pipeline **ZK‑SNARK** didáctico sobre `𝔽ₚ` (`P = 2⁶¹ − 1`), Fiat–Shamir |
-| `src/ffi_ingest.rs` | 376 | **Ingesta omnívora** C/Python → AST *Shoresh* (saneamiento, valencia, riesgo) |
-| `src/temporal_rollback.rs` | 264 | Navegación temporal y **rollback atómico `Δ⁻¹`** (`push`/`pop`/`replace`) |
-| `src/quantum_native.rs` | 940 | **Qubits nativos** `Qubit<\|ψ⟩>`, amplitudes complejas, pares de Bell, colapso determinista |
-| `src/mesh_sync.rs` | 1057 | **Malla global holográfica**: relojes vectoriales, bus en proceso e hilos `std` |
+| `src/zk_proof.rs` | 482 | Pipeline **ZK‑SNARK** didáctico sobre `𝔽ₚ` (`P = 2⁶¹ − 1`), Fiat–Shamir |
+| `src/ffi_ingest.rs` | 380 | **Ingesta omnívora** C/Python → AST *Shoresh* (saneamiento, valencia, riesgo) |
+| `src/temporal_rollback.rs` | 273 | Navegación temporal y **rollback atómico `Δ⁻¹`** (`push`/`pop`/`replace`) |
+| `src/quantum_native.rs` | 955 | **Qubits nativos** `Qubit<\|ψ⟩>`, amplitudes complejas, pares de Bell, colapso determinista |
+| `src/mesh_sync.rs` | 1053 | **Malla global holográfica**: relojes vectoriales, bus en proceso e hilos `std` |
 | `src/metal_ir.rs` | 949 | **Metal‑IR**: *layout* abstracto de registros, ISA de 32 bits y **bypass del driver** |
-| `src/repl.rs` | 828 | **Oráculo REPL**: lengua natural → programa *Shoresh*, meta‑comandos, carga de manifiestos |
-| `src/bin/bara_oracle.rs` | 331 | **Oráculo en vivo**: binario dedicado (pipeline nativo + manifiestos + bucle interactivo) |
-| `src/lib.rs` | 53 | *Crate root*: mapa de módulos, reexportaciones, invariantes |
-| `src/main.rs` | 756 | Génesis de 13 fases + bucle del oráculo |
+| `src/repl.rs` | 859 | **Oráculo REPL**: lengua natural → programa *Shoresh*, meta‑comandos, carga de manifiestos |
+| `src/bin/bara_oracle.rs` | 335 | **Oráculo en vivo**: binario dedicado (pipeline nativo + manifiestos + bucle interactivo) |
+| `src/lib.rs` | 55 | *Crate root*: mapa de módulos, reexportaciones, invariantes |
+| `src/main.rs` | 769 | Génesis de 13 fases + bucle del oráculo |
 
 ## Las 13 fases del génesis
 
@@ -64,7 +64,10 @@ malla global de memoria holográfica · `FASE 12` Metal‑IR (bypass del driver)
 2. **Totalidad** — ninguna entrada provoca un pánico: lo incomprensible se degrada
    a un valor **tolerado**.
 3. **Determinismo** — no hay aleatoriedad real: todo colapso o huella deriva de
-   hashes **FNV‑1a** estables (reproducible *bit a bit*).
+   hashes **FNV‑1a** estables (reproducible *bit a bit*). El determinismo se
+   predica del **estado lógico**: los campos de **métricas de reloj de pared**
+   (`*.micros`, `Delta.at_micros`, `epoch`) están marcados en el código como
+   **NO DETERMINISTAS** y quedan fuera de toda comparación, huella o firma.
 4. **Sin `unsafe`** — el *kernel* entero es Rust seguro.
 
 ---
@@ -102,6 +105,32 @@ cargo test --release -- --nocapture
 El binario `bara` admite un guion por `stdin`: cada línea se interpreta como
 lengua natural o como meta‑comando del oráculo (`:estado`, `:memoria`, `:zk`,
 `:cuántica`, `:deshacer`, `:salir`, …).
+
+### Perfil release y workspace
+
+El kernel declara su perfil release (`opt-level = 3`, `lto = true`,
+`codegen-units = 1`, `panic = "abort"`) en **`.cargo/config.toml`**, no en
+`Cargo.toml`: Cargo sólo acepta `[profile.*]` en el manifiesto de la **raíz** del
+workspace, así que declararlo en el manifiesto del kernel emitía el aviso
+*«profiles for the non root package will be ignored»* y —lo grave— lo ignoraba
+**de verdad** (LTO desactivado, `panic` unwind, 16 unidades de código) cuando se
+compilaba desde el contenedor `../Cargo.toml`. Ahora hay **una sola fuente de
+perfil por raíz**:
+
+| Se compila desde | Manda | Efecto |
+|---|---|---|
+| `BAR/` — CI y autohospedaje (el repositorio clonado es su propia raíz) | `BAR/.cargo/config.toml` | LTO + `codegen-units=1` + `panic=abort` |
+| `Downloads/` — workspace contenedor (con `bara-ide`) | `Downloads/Cargo.toml` (bloque idéntico) | lo mismo |
+
+`scripts/check_profiles.ps1` —también paso **bloqueante** del CI— falla si ambos
+perfiles divergen, de modo que la compilación del kernel no puede degradarse en
+silencio. El estilo se aplica y se verifica desde el kernel para no reflotar el
+IDE vecino:
+
+```bash
+cargo fmt -p bara            # aplica el reflujo sólo al kernel
+cargo fmt -p bara --check    # verifica (en CI: cargo fmt --all --check)
+```
 
 ### Oráculo en vivo (`bara_oracle`)
 
@@ -150,8 +179,8 @@ $ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
 
 | Archivo | Líneas | Pruebas | Cobertura |
 |---|---:|---:|---|
-| `tests/integration_suite.rs` | 1336 | **30** | léxico, runtime/Belnap, memoria holográfica, autopoiesis, regiones, ZK‑SNARK, FFI, `Δ⁻¹`, cuántica/Bell, malla (bus vs hilos), códec *wire*, Metal‑IR, oráculo REPL, manifiestos, pipeline nativo |
-| `tests/stress_test.rs` | 569 | **10** | PRNG SplitMix64 propio: inundación de paradojas, rollback profundo, mutación masiva del AST, tormenta de memoria, fuente adversarial, tormenta de conflictos en la malla, tormenta cuántica, presión de Metal‑IR, tormenta FFI, conversación hostil del oráculo |
+| `tests/integration_suite.rs` | 1412 | **30** | léxico, runtime/Belnap, memoria holográfica, autopoiesis, regiones, ZK‑SNARK, FFI, `Δ⁻¹`, cuántica/Bell, malla (bus vs hilos), códec *wire*, Metal‑IR, oráculo REPL, manifiestos, pipeline nativo |
+| `tests/stress_test.rs` | 596 | **10** | PRNG SplitMix64 propio: inundación de paradojas, rollback profundo, mutación masiva del AST, tormenta de memoria, fuente adversarial, tormenta de conflictos en la malla, tormenta cuántica, presión de Metal‑IR, tormenta FFI, conversación hostil del oráculo |
 
 Los *tests* enlazan el mismo *kernel* (`use bara::…`), por lo que no hay copias
 divergentes de los tipos: lo que pasa en las pruebas es lo que ejecuta el binario.
@@ -186,6 +215,11 @@ sintetizadas.
   física: la intención es reproducibilidad total.
 * El códec *wire* es bit‑exacto para estados clásicos y paraconsistentes; las
   superposiciones se **renormalizan** al decodificar.
+* La verificación es **determinista por casos** (40 axiomas ejecutables + 10
+  arneses de estrés con generador SplitMix64 propio y **semilla fija**, sin
+  `rand`): no hay *property‑testing* sobre entradas aleatorias ni demostrador
+  interactivo (Kani/Prusti/Lean), porque implicarían dependencias externas y
+  romperían el invariante de **sólo `std`**.
 
 ## Flujo de desarrollo
 
@@ -196,7 +230,7 @@ main ──●──────────────────────
 ```
 
 * **`main`** — rama estable y **protegida**: sólo recibe cambios por *pull request*
-  que pasa el CI (4 checks obligatorios) e historial lineal; sin push directo ni
+  que pasa el CI (5 checks obligatorios) e historial lineal; sin push directo ni
   *force push*.
 * **`dev`** — rama de integración: aquí vive el trabajo diario; cada *commit*
   mantiene el kernel compilando sin advertencias y con la suite completa en verde.
@@ -214,7 +248,7 @@ git push                        # upstream ya configurado (origin/dev)
 # Cuando dev está verde, se promueve a estable mediante PR
 # (`main` protegida: sin push directo, CI obligatorio, historial lineal):
 gh pr create --base main --head dev --title "promoción dev → main"   # o desde la web
-gh pr merge --squash            # squash ⇒ historial lineal; exige los 4 checks verdes
+gh pr merge --squash            # squash ⇒ historial lineal; exige los 5 checks verdes
 git switch dev
 ```
 
@@ -226,25 +260,29 @@ git switch dev
 | Job | Matriz | Comando | ¿Bloquea la fusión? |
 |---|---|---|---|
 | `CI (…, debug)` · `CI (…, release)` | `ubuntu-latest` y `windows-latest` × `debug` y `release` (4 jobs) | `cargo test --all-targets --workspace [--release] --locked` | **Sí** |
-| `Lints (clippy + rustfmt)` | `ubuntu-latest` | `cargo clippy … -- -D warnings` (**bloqueante**) · `cargo fmt --all --check` (informativo) | **Sí** (clippy) |
+| `Lints (clippy + totalidad + rustfmt + perfiles)` | `ubuntu-latest` | `cargo clippy … -- -D warnings` · `grep` de totalidad en `src/` · `cargo fmt --all --check` · `pwsh scripts/check_profiles.ps1` | **Sí** (los cuatro pasos) |
 
 Política de **cero advertencias**: el *workflow* exporta `RUSTFLAGS=-D warnings`,
 así que cualquier aviso de `rustc` (en la biblioteca, en el binario o en las
 pruebas) hace fallar el job. `--locked` garantiza que se compila exactamente el
 `Cargo.lock` publicado.
 
-**Estado de la puerta de calidad.** Clippy está **limpio**: los 10 lints que
-quedaban —`map_entry` e `iter_cloned_collect` (`src/mesh_sync.rs`),
+**Estado de la puerta de calidad.** Clippy está **limpio** (0 avisos): los 10
+lints que quedaban —`map_entry` e `iter_cloned_collect` (`src/mesh_sync.rs`),
 `manual_div_ceil` (`src/metal_ir.rs`), `approx_constant` ×2 y `manual_clamp`
 (`src/runtime.rs`), `should_implement_trait` ×3 (`src/zk_proof.rs`) y `len_zero`
 (`tests/integration_suite.rs`)— están resueltos (`Fp` implementa ahora
-`Add`/`Sub`/`Mul` de `std::ops`), así que el job **bloquea** la fusión.
+`Add`/`Sub`/`Mul` de `std::ops`).
 
-Queda una única deuda **estilística**: `cargo fmt --all --check` sigue marcando
-diferencias porque el kernel usa alineación manual deliberada (cadenas y firmas
-más anchas que los valores por defecto de `rustfmt`); por eso ese paso se ejecuta
-como informativo (`continue-on-error` a nivel de paso). Para cerrarlo:
-`cargo fmt --all`, commit del reflujo y quitar el flag del paso.
+El **reflujo estilístico ya está asentado** (`cargo fmt --all --check` pasa), así
+que ese paso dejó de ser informativo y bloquea junto a dos guardas nuevas:
+
+* **Totalidad (A1)** — `grep` sobre `src/` que falla si reaparece un `expect()` o
+  un `unwrap()`: el kernel es total y jamás aborta (los tests sí pueden usarlos
+  para expresar sus aserciones).
+* **Perfiles** — `scripts/check_profiles.ps1` comprueba que el perfil release del
+  kernel (`.cargo/config.toml`) y el del workspace contenedor (`../Cargo.toml`)
+  siguen siendo idénticos, para que ningún contexto compile sin LTO por descuido.
 
 ### Protección de la rama `main`
 
@@ -268,9 +306,10 @@ CI (idealmente promociones `dev → main`).
    * ✅ **Require a pull request before merging** — *Required approvals*: `0`
      (podrás fusionar tu propio PR, pero **no** hacer push directo).
    * ✅ **Require status checks to pass before merging** + **Require branches to be
-     up to date before merging**, y selecciona los cuatro checks obligatorios:
+     up to date before merging**, y selecciona los cinco checks obligatorios:
      `CI (ubuntu-latest, debug)`, `CI (ubuntu-latest, release)`,
-     `CI (windows-latest, debug)`, `CI (windows-latest, release)`.
+     `CI (windows-latest, debug)`, `CI (windows-latest, release)` y
+     `Lints (clippy + totalidad + rustfmt + perfiles)`.
    * ✅ **Require linear history** · ✅ **Require conversation resolution**.
    * ✅ **Do not allow bypassing the above settings** — aplica también a los
      administradores y es lo que **realmente bloquea el push directo**.
@@ -289,7 +328,7 @@ CI (idealmente promociones `dev → main`).
    `.github/main-protection.json`.)
 
 Con esto el ciclo queda blindado: `dev` como rama de trabajo con CI verde → PR
-`dev → main` con 4 checks obligatorios → fusión con historial lineal, sin push
+`dev → main` con 5 checks obligatorios → fusión con historial lineal, sin push
 directo ni *force push*.
 
 ## Licencia
