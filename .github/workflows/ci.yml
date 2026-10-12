@@ -1,0 +1,127 @@
+---
+# ══════════════════════════════════════════════════════════════════════════
+#  CI · Bara (בָּרָא) / AETHER-Ω — Integración continua del kernel
+#
+#  Objetivo: ningún cambio llega a `dev` (y por tanto a `main`) sin pasar la
+#  suite completa (30 pruebas de integración + 10 de estrés = 40) en los
+#  perfiles debug y release, en Linux y Windows, con política estricta de cero
+#  advertencias (`RUSTFLAGS = -D warnings`).
+# ══════════════════════════════════════════════════════════════════════════
+name: CI — Bara (AETHER-Ω)
+
+# 1. Disparadores: push y pull_request sobre `dev` (desarrollo activo) y
+#    `main` (rama estable). `workflow_dispatch` permite relanzarlo a mano.
+#    La clave va entrecomillada a proposito: en YAML 1.1 el literal `on` se
+#    resuelve como el booleano `true` y los validadores estrictos lo marcan
+#    (regla `truthy`). Entrecomillada es texto en todas las versiones.
+"on":
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+
+# Cancela ejecuciones obsoletas de la misma rama/PR (ahorra minutos de runner).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Mínimo privilegio: el CI sólo necesita leer el repositorio.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  # Política de cero advertencias: cualquier `warning` de rustc es un error.
+  # El valor va entrecomillado: empieza por `-` y asi ningun parser lo confunde
+  # con el inicio de una entrada de secuencia.
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ── Puerta OBLIGATORIA: matriz sistema operativo × perfil ────────────────
+  test:
+    name: CI (${{ matrix.os }}, ${{ matrix.profile }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      # No abortar el resto de la matriz si una combinación falla: queremos
+      # el diagnóstico completo (Linux vs Windows, debug vs release).
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        profile:
+          - debug
+          - release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar toolchain oficial de Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Caché de registros y de target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.profile }}
+
+      - name: cargo test --all-targets --workspace (perfil debug)
+        if: matrix.profile == 'debug'
+        run: cargo test --all-targets --workspace --locked
+
+      - name: cargo test --all-targets --workspace --release (perfil release)
+        if: matrix.profile == 'release'
+        run: cargo test --all-targets --workspace --locked --release
+
+  # ── Puerta OBLIGATORIA de calidad: clippy + totalidad + rustfmt + perfiles
+  #    Los cuatro pasos **bloquean** la fusión:
+  #      · clippy    — 0 avisos con `-D warnings`.
+  #      · totalidad — `src/` sin `expect()` ni `unwrap()`: el kernel es total
+  #                    y tolerante, jamás aborta (axioma A1).
+  #      · rustfmt   — el reflujo de `cargo fmt` ya está asentado, así que la
+  #                    comprobación dejó de ser informativa.
+  #      · perfiles  — el perfil release del kernel vive en
+  #                    `.cargo/config.toml` (véase scripts/check_profiles.ps1);
+  #                    este paso impide que se degrade a los valores por
+  #                    defecto (LTO desactivado, `panic` unwind).
+  lints:
+    name: Lints (clippy + totalidad + rustfmt + perfiles)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar toolchain oficial de Rust (stable) con componentes
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Caché de registros y de target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ubuntu-latest-lints
+
+      - name: cargo clippy --all-targets --workspace -- -D warnings
+        run: cargo clippy --all-targets --workspace --locked -- -D warnings
+
+      - name: Totalidad estática (A1 · sin expect() ni unwrap() en src/)
+        run: |
+          if grep -rn --include='*.rs' -E '\.expect\(|\.unwrap\(' src/; then
+            echo '::error::aparecio expect()/unwrap() en src/ — A1 exige totalidad sin excepciones'
+            exit 1
+          fi
+          echo 'OK: src/ sin expect() ni unwrap(); el kernel no puede abortar.'
+
+      - name: cargo fmt --all --check (bloqueante)
+        run: cargo fmt --all --check
+
+      - name: Perfil release del kernel (scripts/check_profiles.ps1)
+        shell: pwsh
+        run: ./scripts/check_profiles.ps1

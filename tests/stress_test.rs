@@ -63,8 +63,8 @@ impl SplitMix64 {
 
 /// Alfabeto consonántico hebreo, para sintetizar raíces de estrés.
 const CONSONANTS: [char; 22] = [
-    'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר',
-    'ש', 'ת',
+    'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק',
+    'ר', 'ש', 'ת',
 ];
 
 /// Raíz triconsonántica pseudoaleatoria.
@@ -170,7 +170,6 @@ fn deep_rollback_reverts_thousands_of_deltas_atomically() {
     assert_eq!(engine.stack().len(), 1);
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────
 // 2 · Mutación masiva del AST y memoria holográfica
 // ─────────────────────────────────────────────────────────────────────────
@@ -213,7 +212,10 @@ fn high_frequency_ast_mutation_stays_bounded() {
     let sample = roots[0].clone();
     assert_eq!(
         twin.mutator.axiom(&sample).map(|axiom| axiom.rule.clone()),
-        runtime.mutator.axiom(&sample).map(|axiom| axiom.rule.clone())
+        runtime
+            .mutator
+            .axiom(&sample)
+            .map(|axiom| axiom.rule.clone())
     );
 
     // La repetición no muta el lenguaje ni acumula entropía.
@@ -290,11 +292,12 @@ fn executor_survives_adversarial_sources() {
     assert!(!log.is_empty());
     assert!(log.iter().all(|event| !event.describe().is_empty()));
     assert!(log.iter().any(|e| matches!(e, ExecutionEvent::Root { .. })));
-    assert!(log.iter().any(|e| matches!(e, ExecutionEvent::Collapse { .. })));
+    assert!(log
+        .iter()
+        .any(|e| matches!(e, ExecutionEvent::Collapse { .. })));
     assert!(log.iter().any(|e| matches!(e, ExecutionEvent::Fold { .. })));
     assert!(runtime.mutator.generation() > 0, "hubo autopoiesis");
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 // 3 · Tormenta de conflictos en la malla holográfica
@@ -349,7 +352,10 @@ fn mesh_conflict_storm_converges_under_every_transport() {
 
     // C) Re-sincronizar es una no-operación: entropía cero por reenvío.
     assert_eq!(cluster.synchronize(3).digest, bus.digest);
-    assert_eq!(threaded_cluster.synchronize_threaded(3).digest, threaded.digest);
+    assert_eq!(
+        threaded_cluster.synchronize_threaded(3).digest,
+        threaded.digest
+    );
     assert_eq!(threaded_cluster.synchronize(3).digest, bus.digest);
 }
 
@@ -426,7 +432,9 @@ fn quantum_storm_is_total_deterministic_and_bounded() {
     // Con otro ruido los colapsos cambian (la semilla importa).
     let other = quantum_storm(0xBABA_0008);
     assert_eq!(other.len(), 64);
-    assert!(first.iter().all(|outcome| outcome.map(|index| index < 2).unwrap_or(true)));
+    assert!(first
+        .iter()
+        .all(|outcome| outcome.map(|index| index < 2).unwrap_or(true)));
 
     // Ninguna operación cuántica sobre un qubit inexistente provoca pánico.
     let mut registry = QuantumNative::new();
@@ -435,7 +443,6 @@ fn quantum_storm_is_total_deterministic_and_bounded() {
     assert!(registry.phase_shift("inexistente", 1.0).is_none());
     assert!(registry.entangle("a", "b", BellPhase::PhiMinus).is_none());
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 // 5 · Presión de registros y traducción masiva a Metal‑IR
@@ -455,11 +462,16 @@ fn metal_allocator_spills_without_failing_under_pressure() {
     let allocation = RegAllocation::allocate(&ranges);
     assert_eq!(allocation.allocated() + allocation.spilled(), ranges.len());
     assert!(allocation.allocated() <= metal_ir::capacity());
-    assert!(allocation.spilled() > 0, "la presión desborda hacia derrames");
+    assert!(
+        allocation.spilled() > 0,
+        "la presión desborda hacia derrames"
+    );
     assert_eq!(allocation.spill_bytes(), allocation.spilled() * 8);
     assert!(allocation.pressure() <= 1.0);
     assert!(allocation.occupancy() <= 1.0);
-    assert!(allocation.bank_usage().all(|(_, used)| used <= metal_ir::capacity()));
+    assert!(allocation
+        .bank_usage()
+        .all(|(_, used)| used <= metal_ir::capacity()));
 
     // Flujo masivo de tokens: la traducción es total y determinista.
     let mut rng = SplitMix64::new(0xBABA_0009);
@@ -509,9 +521,7 @@ fn ffi_ingest_storm_sanitizes_every_hostile_declaration() {
     assert!(nodes
         .iter()
         .all(|node| node.root.chars().count() == 3 && state_is_sane(&node.valence)));
-    assert!(nodes
-        .iter()
-        .all(|node| (0.0..=1.0).contains(&node.hazard)));
+    assert!(nodes.iter().all(|node| (0.0..=1.0).contains(&node.hazard)));
 
     let hostile = nodes.iter().filter(|node| node.hazard > 0.0).count();
     assert!(hostile > 0, "hubo punteros y constructos peligrosos");
@@ -520,7 +530,11 @@ fn ffi_ingest_storm_sanitizes_every_hostile_declaration() {
         hostile,
         "todo riesgo se sella; nada se rechaza"
     );
-    assert_eq!(runtime.regions.len(), nodes.len(), "una región SHARED por nodo");
+    assert_eq!(
+        runtime.regions.len(),
+        nodes.len(),
+        "una región SHARED por nodo"
+    );
 
     // La ingesta es determinista y conserva el invariante del AST agregado.
     let ast = ffi_ingest::to_shoresh(&ffi_ingest::ingest_c(&source));
@@ -533,7 +547,15 @@ fn ffi_ingest_storm_sanitizes_every_hostile_declaration() {
 fn oracle_storm_tolerates_a_hostile_conversation() {
     let mut rng = SplitMix64::new(0xBABA_000B);
     let commands = [
-        "ayuda", "estado", "memoria", "tiempo", "cuántica", "malla", "metal", "zk", "deshacer",
+        "ayuda",
+        "estado",
+        "memoria",
+        "tiempo",
+        "cuántica",
+        "malla",
+        "metal",
+        "zk",
+        "deshacer",
         "salir",
     ];
     let inputs: Vec<String> = (0..240)
@@ -562,8 +584,13 @@ fn oracle_storm_tolerates_a_hostile_conversation() {
     assert!(runtime.stack.iter().all(state_is_sane));
     assert_eq!(runtime.memory.entropy(), 0.0);
     assert!(!runtime.log().is_empty());
-    assert!(runtime.log().iter().all(|event| !event.describe().is_empty()));
-    assert!(runtime.mutator.generation() > 0, "aprendió del desarrollador");
+    assert!(runtime
+        .log()
+        .iter()
+        .all(|event| !event.describe().is_empty()));
+    assert!(
+        runtime.mutator.generation() > 0,
+        "aprendió del desarrollador"
+    );
     assert!(runtime.mutator.generation() <= 240, "pero sin explotar");
 }
-

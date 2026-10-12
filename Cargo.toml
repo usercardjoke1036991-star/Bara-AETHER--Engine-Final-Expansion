@@ -19,16 +19,21 @@ path = "src/lib.rs"
 # ─────────────────────────────────────────────────────────────────────────
 # Perfil de release — máximo rendimiento nativo (AETHER-Ω)
 # ─────────────────────────────────────────────────────────────────────────
-# * `opt-level = 3`  — optimización agresiva (vectorización, inlining).
-# * `lto = true`     — *link-time optimization*: el AST, el runtime y la malla
-#                      se compilan como una única unidad de traducción.
-# * `codegen-units = 1` — elimina barreras de optimización entre unidades.
-# * `panic = "abort"`   — el kernel es total y TOLERANTE (jamás entra en pánico);
-#                      abortar en vez de desenrollar recorta el *prologue* y
-#                      habilita optimizaciones que dependen de `nounwind`.
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
+# NO se declara aquí: Cargo sólo admite `[profile.*]` en el manifiesto de la
+# raíz del workspace, de modo que en este paquete (miembro del contenedor
+# `../Cargo.toml`) producía el aviso «profiles for the non root package will
+# be ignored» y el perfil se ignoraba realmente (LTO desactivado, `panic`
+# unwind). El kernel declara su perfil en `.cargo/config.toml`, que sí se lee
+# cuando `bara` es su propia raíz (CI y autohospedaje).
+#
+# Valores exigidos (idénticos a los de `../Cargo.toml`; la coherencia de ambos
+# la verifica `scripts/check_profiles.ps1`):
+#   opt-level = 3 · lto = true · codegen-units = 1 · panic = "abort"
+#   * `opt-level = 3`     — optimización agresiva (vectorización, inlining).
+#   * `lto = true`        — *link-time optimization*: el AST, el runtime y la
+#                           malla se compilan como una única unidad.
+#   * `codegen-units = 1` — elimina barreras de optimización entre unidades.
+#   * `panic = "abort"`   — el kernel es total y TOLERANTE (jamás entra en
+#                           pánico); abortar en vez de desenrollar recorta el
+#                           *prologue* y habilita optimizaciones `nounwind`.
 

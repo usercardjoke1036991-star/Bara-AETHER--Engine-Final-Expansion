@@ -22,6 +22,7 @@
 
 use crate::memory_region::RegionId;
 use crate::runtime::QuantumState;
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::mpsc;
 use std::thread;
@@ -501,12 +502,7 @@ impl MeshNode {
     }
 
     /// Escribe una entrada. Devuelve `(clave, ¿cambió?)`.
-    pub fn insert(
-        &mut self,
-        name: &str,
-        region: RegionId,
-        state: QuantumState,
-    ) -> (u64, bool) {
+    pub fn insert(&mut self, name: &str, region: RegionId, state: QuantumState) -> (u64, bool) {
         let candidate = MeshEntry::new(name, region, state, self.epoch);
         if let Some(existing) = self.entries.get(&candidate.key) {
             if existing.matches(&candidate) {
@@ -546,15 +542,17 @@ impl MeshNode {
         let mut merged = 0;
         let mut conflicts = 0;
         for incoming in &frame.entries {
-            if !self.entries.contains_key(&incoming.key) {
-                self.entries.insert(incoming.key, incoming.clone());
-                merged += 1;
-                continue;
-            }
-            if let Some(existing) = self.entries.get_mut(&incoming.key) {
-                if existing.digest != incoming.digest {
-                    existing.merge_with(incoming);
-                    conflicts += 1;
+            match self.entries.entry(incoming.key) {
+                Entry::Vacant(slot) => {
+                    slot.insert(incoming.clone());
+                    merged += 1;
+                }
+                Entry::Occupied(mut slot) => {
+                    let existing = slot.get_mut();
+                    if existing.digest != incoming.digest {
+                        existing.merge_with(incoming);
+                        conflicts += 1;
+                    }
                 }
             }
         }
@@ -705,6 +703,10 @@ pub struct SyncReport {
     /// Fracción de entradas en desacuerdo con la mayoría, en `[0,1]`.
     pub drift: f64,
     /// Duración de la sincronización en microsegundos.
+    ///
+    /// **NO DETERMINISTA** (matiz de A7): métrica de reloj de pared tomada con
+    /// `Instant::now()`; cambia en cada ejecución, así que queda fuera de
+    /// cualquier comparación, serialización, huella o firma.
     pub micros: u128,
     /// `true` si se usaron hilos obreros (`std::thread` + `mpsc`).
     pub threaded: bool,
@@ -794,12 +796,7 @@ impl MeshCluster {
     }
 
     /// Siembra una región en **todos** los nodos (condición inicial común).
-    pub fn seed(
-        &mut self,
-        name: &str,
-        region: RegionId,
-        state: QuantumState,
-    ) -> (PeerId, u64) {
+    pub fn seed(&mut self, name: &str, region: RegionId, state: QuantumState) -> (PeerId, u64) {
         let mut key = 0;
         for node in self.nodes.iter_mut() {
             let (k, _) = node.insert(name, region, state.clone());
@@ -825,17 +822,16 @@ impl MeshCluster {
     /// Huella holográfica global: `XOR` de las huellas de cada nodo, mezcladas
     /// con su índice para que nodos idénticos **no se cancelen** entre sí.
     pub fn hologram(&self) -> u64 {
-        self.nodes
-            .iter()
-            .fold(0_u64, |acc, node| acc ^ mix64(node.hologram(), node.id as u64))
+        self.nodes.iter().fold(0_u64, |acc, node| {
+            acc ^ mix64(node.hologram(), node.id as u64)
+        })
     }
 
     /// ¿Todos los nodos comparten la misma huella (y hay contenido)?
     pub fn converged(&self) -> bool {
         match self.nodes.first() {
             Some(first) => {
-                !first.is_empty()
-                    && self.nodes.iter().all(|n| n.hologram() == first.hologram())
+                !first.is_empty() && self.nodes.iter().all(|n| n.hologram() == first.hologram())
             }
             None => false,
         }
@@ -958,7 +954,7 @@ impl MeshCluster {
         });
 
         let mut handles = Vec::with_capacity(peers);
-        let node_seeds: Vec<MeshNode> = self.nodes.iter().cloned().collect();
+        let node_seeds: Vec<MeshNode> = self.nodes.to_vec();
         for (id, (rx, mut node)) in inboxes.into_iter().zip(node_seeds).enumerate() {
             let announce = announce_tx.clone();
             let done = done_tx.clone();

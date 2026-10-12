@@ -1,0 +1,36 @@
+# ══════════════════════════════════════════════════════════════════════════
+#  Perfil release del kernel — Bara (בָּרָא) / AETHER-Ω
+#
+#  ¿Por qué aquí y no en `Cargo.toml`?
+#  -----------------------------------
+#  `bara` es simultáneamente:
+#    • un **paquete soberano**: el CI clona el repositorio y entonces `BAR` es
+#      su propia raíz de workspace (el autohospedaje también lo compilará
+#      suelto), y
+#    • un **miembro** del workspace contenedor de desarrollo (`../Cargo.toml`,
+#      el de `Downloads/`).
+#
+#  Cargo sólo admite `[profile.*]` en el manifiesto de la RAÍZ del workspace,
+#  así que declararlo en `Cargo.toml` producía, al compilar desde el
+#  contenedor:
+#      warning: profiles for the non root package will be ignored,
+#               specify profiles at the workspace root
+#  y, lo grave, el perfil se ignoraba **de verdad**: `rustc` recibía
+#  `-C embed-bitcode=no` en lugar de `-C lto` y `release` caía a los valores
+#  por defecto (LTO desactivado, `panic` unwind, 16 unidades de código).
+#
+#  Los perfiles de `.cargo/config.toml` se resuelven por **directorio de
+#  trabajo** (Cargo Book · «Configuration»): valen cuando el kernel es la
+#  raíz y NO se leen desde la raíz del workspace —allí manda
+#  `../Cargo.toml`, que declara el mismo perfil—. Resultado: una sola fuente
+#  por raíz, cero avisos y cero ambigüedad.
+#
+#  Guarda de divergencia (los dos perfiles deben ser idénticos):
+#      pwsh ./scripts/check_profiles.ps1
+# ══════════════════════════════════════════════════════════════════════════
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

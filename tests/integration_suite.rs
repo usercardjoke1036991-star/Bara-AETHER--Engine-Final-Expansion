@@ -20,7 +20,7 @@ use bara::mesh_sync::{
     IngestOutcome, MeshCluster, MeshEntry, MeshFrame, MeshNode, PeerId, VectorClock,
 };
 use bara::metal_ir::{self, LiveRange, MetalMapper, MetalOpcode, RegAllocation, RegisterClass};
-use bara::quantum_native::{Amplitude, AmplitudeVector, BellPhase, Qubit, QuantumNative};
+use bara::quantum_native::{Amplitude, AmplitudeVector, BellPhase, QuantumNative, Qubit};
 use bara::repl::{self, MetaCommand, Oracle};
 use bara::runtime::{BaraRuntime, ExecutionEvent, Observation, QuantumState};
 use bara::temporal_rollback::{self, TemporalEngine};
@@ -75,7 +75,10 @@ fn near(actual: f64, expected: f64) -> bool {
 #[test]
 fn lexer_extracts_triconsonantal_roots_and_operators() {
     let tokens = genesis_tokens();
-    assert!(tokens.len() > 10, "el génesis produce una corriente de tokens");
+    assert!(
+        tokens.len() > 10,
+        "el génesis produce una corriente de tokens"
+    );
 
     // 1.1 Raíz conocida ⇒ palabra clave destilada.
     let manifest = tokens
@@ -134,7 +137,6 @@ fn lexer_is_total_folding_niqqud_and_tolerating_junk() {
     assert!(junk.iter().any(|token| token.kind == TokenKind::Eof));
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────
 // 2 · Runtime paraconsistente de Belnap (flujo génesis completo)
 // ─────────────────────────────────────────────────────────────────────────
@@ -180,7 +182,11 @@ fn genesis_execution_is_total_and_leaves_consistent_state() {
         count_events(&log, |e| matches!(e, ExecutionEvent::Fold { .. })),
         2
     );
-    assert_eq!(log.len(), 32, "log = 12 raíces + 9 génesis + 11 operaciones");
+    assert_eq!(
+        log.len(),
+        32,
+        "log = 12 raíces + 9 génesis + 11 operaciones"
+    );
 
     // 2.2 La fusión `!!` sobre un clásico genera la paradoja ⊤∧⊥ y el motor
     //     temporal la disuelve con un rollback atómico (no explosión lógica).
@@ -211,17 +217,17 @@ fn genesis_execution_is_total_and_leaves_consistent_state() {
 fn holographic_memory_is_content_addressed_and_idempotent() {
     let mut runtime = BaraRuntime::new();
 
-    let first = runtime
-        .memory
-        .store("alef", QuantumState::classical(true));
-    let second = runtime
-        .memory
-        .store("alef", QuantumState::classical(false));
+    let first = runtime.memory.store("alef", QuantumState::classical(true));
+    let second = runtime.memory.store("alef", QuantumState::classical(false));
 
     assert_eq!(first, second, "la clave deriva del contenido, no del valor");
     assert_eq!(runtime.memory.len(), 1, "reescribir no añade nodos");
     assert_eq!(runtime.memory.writes(), 1, "escritura idempotente");
-    assert_eq!(runtime.memory.entropy(), 0.0, "entropía acumulada siempre 0");
+    assert_eq!(
+        runtime.memory.entropy(),
+        0.0,
+        "entropía acumulada siempre 0"
+    );
 
     let recalled = runtime.memory.recall("alef").expect("nodo recuperable");
     assert!(state_is_sane(&recalled.state));
@@ -350,7 +356,6 @@ fn region_kinds_and_devices_expose_canonical_labels() {
     assert_eq!(Device::Gpu.label(), "GPU");
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────
 // 4 · Verificación ZK‑SNARK (etapa de compilación)
 // ─────────────────────────────────────────────────────────────────────────
@@ -359,13 +364,13 @@ fn region_kinds_and_devices_expose_canonical_labels() {
 fn zk_field_and_polynomial_arithmetic_are_consistent() {
     // 4.1 Campo primo de Mersenne.
     assert_eq!(Fp::new(zk_proof::P), Fp::ZERO, "P ≡ 0 mod P");
-    assert_eq!(Fp::new(2).add(Fp::new(3)), Fp::new(5));
-    assert_eq!(Fp::new(7).sub(Fp::new(9)), Fp::new(zk_proof::P - 2));
-    assert_eq!(Fp::new(6).mul(Fp::new(7)), Fp::new(42));
+    assert_eq!(Fp::new(2) + Fp::new(3), Fp::new(5));
+    assert_eq!(Fp::new(7) - Fp::new(9), Fp::new(zk_proof::P - 2));
+    assert_eq!(Fp::new(6) * Fp::new(7), Fp::new(42));
     assert_eq!(Fp::new(9).pow(3), Fp::new(729));
     assert!(Fp::new(0).is_zero());
     let value = Fp::new(12_345);
-    assert_eq!(value.mul(value.inv()), Fp::ONE, "inverso de Fermat");
+    assert_eq!(value * value.inv(), Fp::ONE, "inverso de Fermat");
 
     // 4.2 Polinomios sobre 𝔽ₚ.
     let sum = Poly::constant(Fp::new(4)).add(&Poly::constant(Fp::new(5)));
@@ -517,8 +522,6 @@ fn ffi_ingestion_maps_and_sanitizes_legacy_code() {
     assert!(near(valence.belnap().0, 0.0));
 }
 
-
-
 // ─────────────────────────────────────────────────────────────────────────
 // 6 · Navegación temporal y rollback atómico Δ⁻¹
 // ─────────────────────────────────────────────────────────────────────────
@@ -547,7 +550,10 @@ fn temporal_rollback_restores_state_atomically() {
     let report = engine.rollback_paradox(marker, &paradox);
     assert_eq!(report.reverted, 3);
     assert!(report.paradox.is_some(), "el informe registra la paradoja");
-    assert!(engine.stack().is_empty(), "la pila vuelve al instante marcado");
+    assert!(
+        engine.stack().is_empty(),
+        "la pila vuelve al instante marcado"
+    );
     assert!(engine.deltas().iter().all(|delta| delta.reverted));
 
     // 6.3 Repetir el rollback es una no-operación (idempotencia).
@@ -582,7 +588,10 @@ fn temporal_deltas_reverse_push_pop_and_replace() {
     // Cuatro deltas reversibles: push, push, replace, pop.
     let report = engine.rollback_to(marker);
     assert_eq!(report.reverted, 4);
-    assert!(engine.stack().is_empty(), "rollback atómico: o todo, o nada");
+    assert!(
+        engine.stack().is_empty(),
+        "rollback atómico: o todo, o nada"
+    );
 }
 
 #[test]
@@ -594,7 +603,6 @@ fn paradox_detection_is_precise_and_tolerant() {
     assert!(is_paradox(&QuantumState::paraconsistent(0.9, 0.9)).is_none());
     assert!(is_paradox(&QuantumState::superposition(1.0, 1.0)).is_none());
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 // 7 · Cuántica nativa: amplitudes, Bell y puente paraconsistente
@@ -629,7 +637,10 @@ fn amplitude_vectors_follow_born_rule_and_interference() {
     assert!(Amplitude::ZERO.is_zero());
     assert!(!Amplitude::from_polar(1.0, 0.0).is_zero());
     assert!(near(Amplitude::IMAGINARY.norm_sqr(), 1.0));
-    assert!(near(Amplitude::IMAGINARY.mul(&Amplitude::IMAGINARY).re, -1.0));
+    assert!(near(
+        Amplitude::IMAGINARY.mul(&Amplitude::IMAGINARY).re,
+        -1.0
+    ));
     assert!(near(Amplitude::ONE.conj().re, 1.0));
     assert!(!Amplitude::ONE.label().is_empty());
 }
@@ -640,14 +651,21 @@ fn bell_pairs_are_maximally_entangled_in_every_convention() {
         let joint = phase.joint();
         assert_eq!(joint.dim(), 4);
         assert!(near(joint.probabilities().iter().sum::<f64>(), 1.0));
-        assert!(near(joint.entropy_bits(), 1.0), "S = 1 bit para un par de Bell");
+        assert!(
+            near(joint.entropy_bits(), 1.0),
+            "S = 1 bit para un par de Bell"
+        );
 
         // La descripción local es la traza parcial: máximamente mixta (I/2).
         let (left, right) = joint.partial_trace_left();
         assert!(near(left, 0.5) && near(right, 0.5));
 
         assert!(!phase.label().is_empty() && !phase.meaning().is_empty());
-        let correlated = if phase.label().starts_with('Φ') { 0 } else { 1 };
+        let correlated = if phase.label().starts_with('Φ') {
+            0
+        } else {
+            1
+        };
         assert_eq!(phase.correlated_index(0), correlated);
         assert!(near(
             phase.correlation(),
@@ -657,11 +675,10 @@ fn bell_pairs_are_maximally_entangled_in_every_convention() {
     assert_eq!(BellPhase::all().len(), 4);
 }
 
-
 #[test]
 fn quantum_registry_bridges_entanglement_to_paraconsistent_valence() {
     let mut registry = QuantumNative::new();
-    assert!(registry.is_empty() && registry.len() == 0);
+    assert!(registry.is_empty());
     assert!(registry.bindings().is_empty() && registry.collapses() == 0);
 
     // 7.5 Un qubit puro se lee como clásico verdadero.
@@ -684,7 +701,9 @@ fn quantum_registry_bridges_entanglement_to_paraconsistent_valence() {
     // El enlace es idempotente y los enlaces imposibles se toleran con `None`.
     registry.entangle("alef", "bet", BellPhase::PhiPlus);
     assert_eq!(registry.bindings().len(), 1);
-    assert!(registry.entangle("alef", "alef", BellPhase::PhiPlus).is_none());
+    assert!(registry
+        .entangle("alef", "alef", BellPhase::PhiPlus)
+        .is_none());
     assert!(registry
         .entangle("alef", "fantasma", BellPhase::PhiPlus)
         .is_none());
@@ -740,7 +759,6 @@ fn quantum_collapse_is_deterministic_and_anticorrelates_in_psi() {
     assert!(!evaluation.nonlocal.is_empty());
 }
 
-
 #[test]
 fn quantum_gates_and_pure_qubits_are_total() {
     let mut registry = QuantumNative::new();
@@ -777,7 +795,11 @@ fn seeded_cluster(peers: usize) -> MeshCluster {
     let mut cluster = MeshCluster::new(peers);
     for index in 0..4 {
         let name = format!("region:{}", index);
-        cluster.seed(&name, RegionId(index), QuantumState::classical(index % 2 == 0));
+        cluster.seed(
+            &name,
+            RegionId(index),
+            QuantumState::classical(index % 2 == 0),
+        );
     }
     cluster
 }
@@ -814,7 +836,6 @@ fn vector_clocks_track_causality_without_coordination() {
     left.set(PeerId(5), 0);
     assert_eq!(left.get(PeerId(5)), 0);
 }
-
 
 #[test]
 fn mesh_cluster_converges_with_bus_and_threads() {
@@ -890,11 +911,11 @@ fn mesh_cluster_converges_with_bus_and_threads() {
     assert_eq!(cluster.synchronize(2).digest, bus.digest);
 }
 
-
 #[test]
 fn wire_codec_round_trips_and_rejects_corruption() {
     let mut node = MeshNode::new(3, 4);
-    let (key_alef, changed) = node.insert("alef", RegionId(1), QuantumState::paraconsistent(0.9, 0.4));
+    let (key_alef, changed) =
+        node.insert("alef", RegionId(1), QuantumState::paraconsistent(0.9, 0.4));
     assert!(changed, "primera escritura ⇒ la entrada cambia");
     node.insert("bet", RegionId(2), QuantumState::classical(false));
     node.insert("gimel", RegionId(3), QuantumState::superposition(1.0, 0.0));
@@ -929,7 +950,12 @@ fn wire_codec_round_trips_and_rejects_corruption() {
 
     // La entrada reconstruida coincide en contenido (clave + huella) con la
     // que se escribió originalmente: el códec no altera la identidad.
-    let expected = MeshEntry::new("alef", RegionId(1), QuantumState::paraconsistent(0.9, 0.4), 7);
+    let expected = MeshEntry::new(
+        "alef",
+        RegionId(1),
+        QuantumState::paraconsistent(0.9, 0.4),
+        7,
+    );
     assert_eq!(expected.key, key_alef);
     assert!(decoded.entries.iter().any(|entry| entry.matches(&expected)));
 
@@ -951,11 +977,17 @@ fn wire_codec_round_trips_and_rejects_corruption() {
     assert_eq!(node.rejected(), 0);
     assert_eq!(node.applied(), 0);
     assert_eq!(node.len(), 3);
-    assert_eq!(node.get(key_alef).map(|entry| entry.name.as_str()), Some("alef"));
+    assert_eq!(
+        node.get(key_alef).map(|entry| entry.name.as_str()),
+        Some("alef")
+    );
     assert!(node.get(0xDEAD_BEEF).is_none());
-    assert_eq!(node.hologram(), frame.digest, "la huella local es el fotograma");
+    assert_eq!(
+        node.hologram(),
+        frame.digest,
+        "la huella local es el fotograma"
+    );
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 // 9 · Metal‑IR: layout abstracto, registros y bypass del driver
@@ -1011,7 +1043,11 @@ fn metal_layout_and_register_allocator_behave_like_hardware() {
         .collect();
     let saturated = RegAllocation::allocate(&heavy);
     assert_eq!(saturated.allocated(), 32);
-    assert_eq!(saturated.spilled(), 8, "el derrame se tolera, no es un error");
+    assert_eq!(
+        saturated.spilled(),
+        8,
+        "el derrame se tolera, no es un error"
+    );
     assert_eq!(saturated.spill_bytes(), 64);
     assert!(saturated.pressure() <= 1.0);
     assert!(saturated.physical(31).is_some());
@@ -1027,7 +1063,11 @@ fn metal_lowering_encodes_the_ast_deterministically() {
         .count();
 
     let cpu = MetalMapper::lower("genesis.metal", Device::Cpu, &tokens);
-    assert_eq!(cpu.len(), emitted + 2, "cada token ⇒ 1 op + Commit + Return");
+    assert_eq!(
+        cpu.len(),
+        emitted + 2,
+        "cada token ⇒ 1 op + Commit + Return"
+    );
     assert_eq!(cpu.words().len(), cpu.len());
     assert!(!cpu.is_empty());
     assert_eq!(cpu.device, Device::Cpu);
@@ -1038,7 +1078,10 @@ fn metal_lowering_encodes_the_ast_deterministically() {
         .iter()
         .zip(cpu.words().iter())
         .all(|(op, word)| op.encode() == *word));
-    assert!(cpu.ops.iter().all(|op| op.lane_mask() >= 1 && op.cycles > 0));
+    assert!(cpu
+        .ops
+        .iter()
+        .all(|op| op.lane_mask() >= 1 && op.cycles > 0));
     assert!(cpu.descriptor() != 0);
     assert!(cpu.bypass.ring_entries.is_power_of_two());
     assert_eq!(cpu.bypass.avoided_syscalls, cpu.len());
@@ -1048,7 +1091,10 @@ fn metal_lowering_encodes_the_ast_deterministically() {
     assert!(near(cpu.dispatch().occupancy, cpu.allocation.occupancy()));
 
     // 9.4 El *layout* cubre todos los virtuales: asignados + derramados.
-    assert_eq!(cpu.allocation.allocated() + cpu.allocation.spilled(), cpu.ranges.len());
+    assert_eq!(
+        cpu.allocation.allocated() + cpu.allocation.spilled(),
+        cpu.ranges.len()
+    );
     assert!(cpu.ranges.iter().all(|range| range.span() >= 1));
 
     // 9.5 La traducción es pura: mismos tokens ⇒ mismo programa.
@@ -1069,7 +1115,11 @@ fn metal_lowering_encodes_the_ast_deterministically() {
     let mut codes: Vec<u32> = opcodes.iter().map(|opcode| opcode.code()).collect();
     codes.sort_unstable();
     codes.dedup();
-    assert_eq!(codes.len(), opcodes.len(), "cada opcode tiene código propio");
+    assert_eq!(
+        codes.len(),
+        opcodes.len(),
+        "cada opcode tiene código propio"
+    );
     assert!(opcodes.iter().all(|opcode| opcode.latency() >= 1));
     assert!(opcodes.iter().any(|opcode| opcode.is_barrier()));
     assert!(
@@ -1077,7 +1127,6 @@ fn metal_lowering_encodes_the_ast_deterministically() {
         "el cierre se firma en el descriptor"
     );
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 // 10 · Oráculo REPL: lengua natural → programa Shoresh y Δ⁻¹ manual
@@ -1119,8 +1168,14 @@ fn natural_language_compiles_to_shoresh_roots() {
     let (program, roots, synthesized) = repl::natural_to_roots("crea un mundo con luz");
     assert!(!program.trim().is_empty());
     assert!(roots.contains(&"ברא".to_string()), "«crea» ⇒ ברא");
-    assert!(root_count(&roots) >= 1, "«mundo» se sintetiza por autopoiesis");
-    assert!(root_count(&roots) <= 3, "la autopoiesis está acotada por turno");
+    assert!(
+        root_count(&roots) >= 1,
+        "«mundo» se sintetiza por autopoiesis"
+    );
+    assert!(
+        root_count(&roots) <= 3,
+        "la autopoiesis está acotada por turno"
+    );
     assert!(synthesized <= 3);
 
     // Operadores invocables por nombre.
@@ -1153,10 +1208,7 @@ fn oracle_session_compiles_conversation_and_never_panics() {
         let mut oracle = Oracle::new(&mut runtime);
         assert!(!oracle.interactive_session());
         oracle.mark_interactive(false);
-        assert!(matches!(
-            oracle.interpret(""),
-            bara::repl::Intent::Empty
-        ));
+        assert!(matches!(oracle.interpret(""), bara::repl::Intent::Empty));
         assert!(matches!(
             oracle.interpret(":ayuda"),
             bara::repl::Intent::Meta(MetaCommand::Help)
@@ -1181,14 +1233,53 @@ fn oracle_session_compiles_conversation_and_never_panics() {
         ])
     };
 
-    assert_eq!(report.turns, 10, "cada consulta produce exactamente un turno");
+    assert_eq!(
+        report.turns, 10,
+        "cada consulta produce exactamente un turno"
+    );
     assert!(report.events > 0, "la conversación compila y ejecuta");
     assert!(!report.roots.is_empty());
     assert_eq!(report.rollbacks, 0);
     assert!(report.label().contains("turno"));
-    assert!(report.micros < 60_000_000, "compilación dinámica en tiempo razonable");
+    assert!(
+        report.micros < 60_000_000,
+        "compilación dinámica en tiempo razonable"
+    );
 }
 
+#[test]
+fn manifest_script_drives_the_oracle_pipeline() {
+    // El manifiesto se documenta con comentarios: se descartan las líneas
+    // vacías y los `#` —de línea completa o de cola— y se conservan los
+    // operadores simbólicos puros (`!!`), que el lexer sí reconoce.
+    let lines = bara::manifest_lines(
+        "# manifiesto de prueba\r\n  ברא   # estructura\r\n\r\n  # sólo una nota\r\n!!\r\n",
+    );
+    assert_eq!(lines, vec!["ברא".to_string(), "!!".to_string()]);
+
+    let mut runtime = BaraRuntime::new();
+    {
+        let mut oracle = Oracle::new(&mut runtime);
+
+        // Un manifiesto sin turnos no es un error: se tolera con informe vacío.
+        assert_eq!(oracle.run_manifest("   \n# sólo comentarios\n").turns, 0);
+
+        // El manifiesto se conversa turno a turno sobre el runtime vivo.
+        let report = oracle.run_manifest("ברא\nברא\n:deshacer\n:estado\n");
+        assert_eq!(
+            report.turns, 4,
+            "cuatro líneas significativas ⇒ cuatro turnos"
+        );
+        assert_eq!(report.rollbacks, 1, "`:deshacer` emite su pulso Δ⁻¹");
+        assert!(report.roots.contains(&"ברא".to_string()));
+        assert!(report.events > 0);
+    }
+    assert_eq!(
+        runtime.stack.len(),
+        1,
+        "el rollback revirtió un turno de ברא"
+    );
+}
 
 #[test]
 fn oracle_undo_rolls_turns_back_completely() {
@@ -1200,16 +1291,17 @@ fn oracle_undo_rolls_turns_back_completely() {
 
     assert_eq!(report.turns, 5);
     assert_eq!(report.rollbacks, 2, "cada Δ⁻¹ manual emite su propio pulso");
-    assert!(runtime.stack.is_empty(), "los dos turnos se deshicieron del todo");
-    assert!(runtime
-        .timeline
-        .deltas()
-        .iter()
-        .all(|delta| delta.reverted));
-    assert!(count_events(runtime.log(), |e| matches!(
-        e,
-        ExecutionEvent::Rollback { .. }
-    )) == 2);
+    assert!(
+        runtime.stack.is_empty(),
+        "los dos turnos se deshicieron del todo"
+    );
+    assert!(runtime.timeline.deltas().iter().all(|delta| delta.reverted));
+    assert!(
+        count_events(runtime.log(), |e| matches!(
+            e,
+            ExecutionEvent::Rollback { .. }
+        )) == 2
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1257,7 +1349,10 @@ fn runtime_native_pipeline_end_to_end() {
 
     // 11.2 Colapso con propagación no local ⇒ valencia clásica.
     let collapsed = runtime.collapse_native("q0").expect("colapso de q0");
-    assert!(collapsed.is_classical(), "tras colapsar, la valencia es clásica");
+    assert!(
+        collapsed.is_classical(),
+        "tras colapsar, la valencia es clásica"
+    );
     assert_eq!(runtime.qubits.collapses(), 1);
     assert!(runtime.qubits.get("q1").unwrap().is_measured());
 
@@ -1282,7 +1377,10 @@ fn runtime_native_pipeline_end_to_end() {
     // 11.6 El log ontológico refleja todo el pipeline y describe cada evento.
     let log = runtime.log().to_vec();
     assert_eq!(
-        count_events(&log, |e| matches!(e, ExecutionEvent::QuantumSuperposed { .. })),
+        count_events(&log, |e| matches!(
+            e,
+            ExecutionEvent::QuantumSuperposed { .. }
+        )),
         2
     );
     assert_eq!(
@@ -1290,7 +1388,10 @@ fn runtime_native_pipeline_end_to_end() {
         1
     );
     assert_eq!(
-        count_events(&log, |e| matches!(e, ExecutionEvent::QuantumCollapsed { .. })),
+        count_events(&log, |e| matches!(
+            e,
+            ExecutionEvent::QuantumCollapsed { .. }
+        )),
         1
     );
     assert_eq!(
@@ -1304,6 +1405,8 @@ fn runtime_native_pipeline_end_to_end() {
     );
     assert!(log.iter().all(|event| !event.describe().is_empty()));
     assert!(runtime.stack.iter().all(state_is_sane));
-    assert!(runtime.certificate.is_none(), "sin etapa de compilación explícita");
+    assert!(
+        runtime.certificate.is_none(),
+        "sin etapa de compilación explícita"
+    );
 }
-

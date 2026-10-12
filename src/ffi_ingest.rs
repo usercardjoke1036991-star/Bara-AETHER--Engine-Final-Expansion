@@ -322,7 +322,11 @@ pub fn ingest_c(source: &str) -> Vec<IngestedDecl> {
         if parts.len() < 2 {
             continue;
         }
-        let name = parts.pop().unwrap_or("").trim_start_matches('*').to_string();
+        let name = parts
+            .pop()
+            .unwrap_or("")
+            .trim_start_matches('*')
+            .to_string();
         if name.is_empty() {
             continue;
         }

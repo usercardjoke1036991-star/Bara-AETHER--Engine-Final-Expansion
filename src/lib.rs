@@ -27,7 +27,9 @@
 //! 2. **Totalidad** — ninguna entrada provoca un pánico: lo incomprensible se
 //!    degrada a un valor *tolerado*.
 //! 3. **Determinismo** — no hay aleatoriedad real; todo colapso o huella deriva
-//!    de hashes FNV‑1a estables.
+//!    de hashes FNV‑1a estables. Los campos de métricas de reloj de pared
+//!    (`micros`, `Delta.at_micros`) están marcados como **NO DETERMINISTAS**:
+//!    quedan fuera de comparaciones, huellas y firmas.
 //! 4. **Sin `unsafe`** — el *kernel* entero es Rust seguro.
 
 #![forbid(unsafe_code)]
@@ -49,5 +51,5 @@ pub mod zk_proof;
 
 pub use memory_region::{Device, RegionId, RegionKind};
 pub use quantum_native::{Amplitude, BellPhase};
-pub use repl::{MetaCommand, Oracle, OracleReport};
+pub use repl::{manifest_lines, MetaCommand, Oracle, OracleReport};
 pub use runtime::{BaraRuntime, ExecutionEvent, Observation, QuantumState};

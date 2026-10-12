@@ -98,8 +98,8 @@ impl QuantumState {
         let norm = (alpha * alpha + beta * beta).sqrt();
         if norm == 0.0 {
             QuantumState::Superposition {
-                alpha: 0.707_106_78,
-                beta: 0.707_106_78,
+                alpha: std::f64::consts::FRAC_1_SQRT_2,
+                beta: std::f64::consts::FRAC_1_SQRT_2,
             }
         } else {
             QuantumState::Superposition {
@@ -282,8 +282,7 @@ impl AutopoieticMutator {
         self.generation += 1;
         let seed = fnv1a(root);
 
-        let modality = ["⊤-estable", "⊥-disolvente", "⊤⊢⊥ metaestable"]
-            [(seed % 3) as usize];
+        let modality = ["⊤-estable", "⊥-disolvente", "⊤⊢⊥ metaestable"][(seed % 3) as usize];
         let invariant = [
             "(x ∧ ¬x) → x",
             "(x ∨ ¬x) → ⊤",
@@ -723,6 +722,10 @@ impl BaraRuntime {
     /// Construye el sistema de restricciones a partir de los axiomas
     /// autopoiéticos y de los invariantes paraconsistentes del runtime,
     /// emite la prueba y la verifica independientemente.
+    ///
+    /// Es total **por construcción**: no hay ninguna ruta de fallo que cubrir
+    /// y por tanto sin `expect()` ni `unwrap()`, y sin `Option` que degradar
+    /// (A1 · totalidad sin excepciones).
     pub fn certify(&mut self) -> &ZkCertificate {
         let mut invariants: Vec<String> = self.mutator.axioms().map(|a| a.rule.clone()).collect();
         invariants.push("∀s ∈ pila · 0 ≤ ⊤(s) ≤ 1 ∧ 0 ≤ ⊥(s) ≤ 1".to_string());
@@ -738,10 +741,12 @@ impl BaraRuntime {
             verified: certificate.result.verified,
             constraints: certificate.statement.n_constraints,
         });
-        self.certificate = Some(certificate);
-        self.certificate
-            .as_ref()
-            .expect("el certificado ZK acaba de ser almacenado")
+        // `Option::insert` almacena el certificado **y** devuelve el préstamo
+        // del valor recién guardado (`&mut ZkCertificate`, que en la posición
+        // de retorno re-coerciona a `&ZkCertificate`). El préstamo nace del
+        // propio `insert`, así que la función es total por construcción: no
+        // queda ninguna ruta de fallo capaz de abortar el proceso (A1).
+        self.certificate.insert(certificate)
     }
 
     /// Ingiere una cabecera C y sanea sus declaraciones hacia el AST *Shoresh*.
@@ -1017,10 +1022,8 @@ impl BaraRuntime {
         match self.pop() {
             Some(from) => {
                 let to = from.observe();
-                let collapsed = QuantumState::classical(matches!(
-                    to,
-                    Observation::True | Observation::Both
-                ));
+                let collapsed =
+                    QuantumState::classical(matches!(to, Observation::True | Observation::Both));
                 self.record(ExecutionEvent::Collapse { from, to });
                 self.push(collapsed);
             }
@@ -1055,8 +1058,7 @@ impl BaraRuntime {
                     self.push(b);
                 }
                 self.record(ExecutionEvent::Tolerated {
-                    reason: "operación binaria con operandos insuficientes (tolerado)"
-                        .to_string(),
+                    reason: "operación binaria con operandos insuficientes (tolerado)".to_string(),
                 });
             }
         }
@@ -1106,13 +1108,7 @@ impl BaraRuntime {
 
 /// Recorta un valor al intervalo `[0, 1]`.
 fn clamp01(x: f64) -> f64 {
-    if x < 0.0 {
-        0.0
-    } else if x > 1.0 {
-        1.0
-    } else {
-        x
-    }
+    x.clamp(0.0, 1.0)
 }
 
 /// Hash FNV-1a de 64 bits. Determinista y sin dependencias externas.
@@ -1133,11 +1129,3 @@ fn affinity_to_hologram(key: u64) -> f64 {
     let hamming = (key ^ HOLOGRAPHIC_REFERENCE).count_ones();
     1.0 - (hamming as f64) / 64.0
 }
-
-
-
-
-
-
-
-

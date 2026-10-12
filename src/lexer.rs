@@ -386,6 +386,3 @@ fn is_hebrew_mark(c: char) -> bool {
 fn is_geresh(c: char) -> bool {
     matches!(c as u32, 0x05F3 | 0x05F4)
 }
-
-
-

@@ -8,6 +8,9 @@ _*.log
 _*.out
 _*.err
 _*.txt
+_*.ps1
+_*.cmd
+_*.sh
 !bar.txt
 
 # ── Entornos / editores ───────────────────────────────────────────────────

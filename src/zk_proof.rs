@@ -23,6 +23,8 @@
 //! de una verificación en etapa de compilación, que es el objetivo del
 //! stub del AETHER-Ω.
 
+use std::ops::{Add, Mul, Sub};
+
 /// Módulo primo de Mersenne: `2⁶¹ − 1`.
 pub const P: u64 = 2_305_843_009_213_693_951;
 
@@ -43,21 +45,6 @@ impl Fp {
     /// Reduce un entero al campo.
     pub fn new(value: u64) -> Self {
         Fp(value % P)
-    }
-
-    /// Suma en el campo.
-    pub fn add(self, other: Fp) -> Fp {
-        Fp(((self.0 as u128 + other.0 as u128) % P as u128) as u64)
-    }
-
-    /// Resta en el campo.
-    pub fn sub(self, other: Fp) -> Fp {
-        Fp(((self.0 as u128 + P as u128 - other.0 as u128) % P as u128) as u64)
-    }
-
-    /// Producto en el campo.
-    pub fn mul(self, other: Fp) -> Fp {
-        Fp(((self.0 as u128 * other.0 as u128) % P as u128) as u64)
     }
 
     /// Exponenciación por cuadrado-y-multiplica.
@@ -82,6 +69,37 @@ impl Fp {
     /// ¿Es el cero aditivo?
     pub fn is_zero(self) -> bool {
         self.0 == 0
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Aritmética de campo con los traits estándar
+// ─────────────────────────────────────────────────────────────────────────
+
+impl Add for Fp {
+    type Output = Fp;
+
+    /// Suma en el campo.
+    fn add(self, other: Fp) -> Fp {
+        Fp(((self.0 as u128 + other.0 as u128) % P as u128) as u64)
+    }
+}
+
+impl Sub for Fp {
+    type Output = Fp;
+
+    /// Resta en el campo.
+    fn sub(self, other: Fp) -> Fp {
+        Fp(((self.0 as u128 + P as u128 - other.0 as u128) % P as u128) as u64)
+    }
+}
+
+impl Mul for Fp {
+    type Output = Fp;
+
+    /// Producto en el campo.
+    fn mul(self, other: Fp) -> Fp {
+        Fp(((self.0 as u128 * other.0 as u128) % P as u128) as u64)
     }
 }
 
@@ -273,9 +291,11 @@ impl ConstraintSystem {
         let seed = if invariants.is_empty() {
             0x9E37_79B9_7F4A_7C15
         } else {
-            invariants.iter().fold(0xcbf2_9ce4_8422_2325u64, |acc, inv| {
-                acc ^ fnv1a(inv.as_bytes())
-            })
+            invariants
+                .iter()
+                .fold(0xcbf2_9ce4_8422_2325u64, |acc, inv| {
+                    acc ^ fnv1a(inv.as_bytes())
+                })
         };
 
         let len = n_constraints + 1;
@@ -296,7 +316,10 @@ impl ConstraintSystem {
 
     /// Deriva el enunciado público asociado a un conjunto de invariantes.
     pub fn statement(&self, label: &str, invariants: &[String]) -> Statement {
-        let mut public_inputs: Vec<Fp> = invariants.iter().map(|inv| Fp::new(fnv1a(inv.as_bytes()))).collect();
+        let mut public_inputs: Vec<Fp> = invariants
+            .iter()
+            .map(|inv| Fp::new(fnv1a(inv.as_bytes())))
+            .collect();
         if public_inputs.is_empty() {
             public_inputs.push(Fp::new(fnv1a(label.as_bytes())));
         }
@@ -408,14 +431,14 @@ pub fn verify(statement: &Statement, proof: &Proof) -> VerifyResult {
     let identity_ok = lhs == rhs;
 
     // 3 — Compromisos presentes y bien formados.
-    let commitments_ok = proof.commitments.len() == 4
-        && proof
-            .commitments
-            .iter()
-            .all(|(name, _)| !name.is_empty());
+    let commitments_ok =
+        proof.commitments.len() == 4 && proof.commitments.iter().all(|(name, _)| !name.is_empty());
 
     let checks = vec![
-        ("Fiat–Shamir: desafío reconstruido".to_string(), fiat_shamir_ok),
+        (
+            "Fiat–Shamir: desafío reconstruido".to_string(),
+            fiat_shamir_ok,
+        ),
         ("Identidad A·B − C = H·Z en r".to_string(), identity_ok),
         ("Compromisos no degenerados".to_string(), commitments_ok),
     ];

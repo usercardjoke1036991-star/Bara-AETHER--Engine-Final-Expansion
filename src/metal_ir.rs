@@ -756,7 +756,7 @@ impl MetalProgram {
     pub fn dispatch(&self) -> DispatchReport {
         let lanes = self.lanes().max(1);
         let ops = self.ops.len();
-        let waves = (ops + lanes as usize - 1) / lanes as usize;
+        let waves = ops.div_ceil(lanes as usize);
         DispatchReport {
             waves: waves.max(1),
             lanes,
