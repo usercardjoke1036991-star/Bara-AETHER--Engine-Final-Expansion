@@ -13,6 +13,8 @@
 //!   *zero-copy* CPU/GPU.
 //! * [`zk_proof`] — pipeline ZK‑SNARK didáctico sobre `𝔽ₚ` (`P = 2⁶¹ − 1`).
 //! * [`ffi_ingest`] — ingesta omnívora de C/Python hacia el AST *Shoresh*.
+//! * [`fractal_geometry`] — proporción áurea (`φ`) y retícula de Fibonacci para
+//!   el reparto espacial de la memoria holográfica y de la tabla de regiones.
 //! * [`temporal_rollback`] — navegación temporal y rollback atómico `Δ⁻¹`.
 //! * [`quantum_native`] — qubits `Qubit<|ψ⟩>`, amplitudes complejas y pares de
 //!   Bell.
@@ -35,6 +37,7 @@
 #![forbid(unsafe_code)]
 
 pub mod ffi_ingest;
+pub mod fractal_geometry;
 pub mod lexer;
 pub mod memory_region;
 pub mod mesh_sync;
@@ -49,6 +52,7 @@ pub mod zk_proof;
 // Reexportaciones de conveniencia
 // ─────────────────────────────────────────────────────────────────────────
 
+pub use fractal_geometry::{fib_ceil, fibonacci, golden_angle, golden_slots, FractalLayout};
 pub use memory_region::{Device, RegionId, RegionKind};
 pub use quantum_native::{Amplitude, BellPhase};
 pub use repl::{manifest_lines, MetaCommand, Oracle, OracleReport};

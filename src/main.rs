@@ -209,6 +209,14 @@ fn hologram_phase(runtime: &mut BaraRuntime) {
         "   afinidad topológica alef↔bet : {:.4}",
         runtime.memory.topological_affinity_to(key_a, key_b)
     );
+    // Reparto espacial armónico: pasos de Fibonacci y orden áureo `i·φ`.
+    let lattice = runtime.memory.layout();
+    println!("   φ-rejilla        : {}", lattice.label());
+    println!(
+        "   cota de relleno  : {:.2}%  (cubo potencia de dos: {:.2}%)",
+        lattice.bound * 100.0,
+        lattice.baseline_bound * 100.0
+    );
 }
 
 /// FASE 5 — la contradicción como valor, no como fallo.
@@ -249,6 +257,11 @@ fn region_phase(runtime: &BaraRuntime) {
             region.depth
         );
     }
+    // Retícula áurea de las regiones vivas (mismo reparto que la memoria).
+    println!(
+        "   φ-rejilla de regiones : {}",
+        runtime.regions.fractal_layout().label()
+    );
 
     // Inferencia pura sobre un conjunto de accesos con rangos de vida.
     let accesses = vec![

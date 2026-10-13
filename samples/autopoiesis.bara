@@ -1,0 +1,30 @@
+# ═══════════════════════════════════════════════════════════════════════
+#  MUESTRA 1 · MUTACIÓN AUTOPOIÉTICA — Bara / AETHER-Ω
+#  Una raíz que el léxico desconoce no es un error: el runtime sintetiza su
+#  axioma (autopoiesis) y el lenguaje crece turno a turno. La misma regla
+#  vale para la lengua natural: los verbos fuera del léxico se aprenden.
+# ───────────────────────────────────────────────────────────────────────
+#  Ejecución:
+#      cargo run --release --bin bara_oracle -- samples/autopoiesis.bara
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── 0 · censo inicial: axiomas vivos y generación del mutador ──────────
+:estado
+
+# ── 1 · tres raíces desconocidas ⇒ tres axiomas nuevos ────────────────
+נצח
+צמח
+אבג
+
+# ── 2 · el axioma nacido ya es ejecutable: ejecuta, juzga y emite ──────
+עבד
+שפט
+אמר
+
+# ── 3 · mutación en lengua natural: verbo conocido + léxico aprendido ──
+crea una lengua y muta el verbo primigenio
+
+# ── 4 · censo final: los axiomas sobreviven en la memoria holográfica ──
+:estado
+:memoria
+:salir

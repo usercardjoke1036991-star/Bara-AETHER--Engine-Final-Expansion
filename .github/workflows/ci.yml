@@ -3,9 +3,9 @@
 #  CI · Bara (בָּרָא) / AETHER-Ω — Integración continua del kernel
 #
 #  Objetivo: ningún cambio llega a `dev` (y por tanto a `main`) sin pasar la
-#  suite completa (30 pruebas de integración + 10 de estrés = 40) en los
-#  perfiles debug y release, en Linux y Windows, con política estricta de cero
-#  advertencias (`RUSTFLAGS = -D warnings`).
+#  suite completa (9 unitarias + 8 fractales + 33 de integración + 10 de estrés
+#  = 60) en los perfiles debug y release, en Linux y Windows, con política
+#  estricta de cero advertencias (`RUSTFLAGS = -D warnings`).
 # ══════════════════════════════════════════════════════════════════════════
 name: CI — Bara (AETHER-Ω)
 

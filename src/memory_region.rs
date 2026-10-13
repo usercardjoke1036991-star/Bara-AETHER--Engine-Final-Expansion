@@ -13,11 +13,15 @@
 //! * **Zero-Copy** — una región puede exponerse simultáneamente a CPU y GPU
 //!   mediante [`ZeroCopyHandle`], sin copia de datos (base de la memoria
 //!   compartida CPU/GPU).
+//! * **Armónica** — el reparto espacial de las regiones vivas sigue una
+//!   retícula áurea (pasos de Fibonacci, orden `i·φ`): véase
+//!   [`RegionTable::fractal_layout`].
 //!
 //! La inferencia (`RegionAnalyzer::infer`) agrupa accesos cuyos rangos de
 //! vida `[birth, death)` se solapan: si dos datos coexisten, comparten
 //! región; si no, se separan en regiones disjuntas.
 
+use crate::fractal_geometry::FractalLayout;
 use std::collections::BTreeMap;
 
 /// Identificador opaco de una región de memoria.
@@ -205,6 +209,29 @@ impl RegionTable {
     /// Profundidad de una región concreta.
     pub fn depth_of(&self, id: RegionId) -> usize {
         self.get(id).map(|r| r.depth).unwrap_or(0)
+    }
+
+    /// Reparto espacial (**retícula áurea**) de las regiones vivas.
+    ///
+    /// Cada región recibe una ranura lógica cuyo paso es el Fibonacci
+    /// inmediatamente mayor que su extensión en bytes, en el orden de la
+    /// secuencia de *phyllotaxis* `i·φ` (véase [`crate::fractal_geometry`]).
+    /// El relleno interno queda acotado por `1 − 1/φ ≈ 38.2 %`, frente al
+    /// `50 %` del reparto por potencias de dos.
+    pub fn fractal_layout(&self) -> FractalLayout {
+        let widths: Vec<usize> = self.regions.iter().map(|region| region.bytes).collect();
+        FractalLayout::plan_from(&widths)
+    }
+
+    /// Fragmentación medida de la retícula de regiones, en `[0,1)`.
+    pub fn fragmentation(&self) -> f64 {
+        self.fractal_layout().fragmentation
+    }
+
+    /// Ranura áurea de una región concreta, si existe.
+    pub fn slot_of(&self, id: RegionId) -> Option<u64> {
+        let position = self.regions.iter().position(|region| region.id == id)?;
+        self.fractal_layout().slot_of(position)
     }
 
     /// Comprueba que `[offset, offset + len)` cabe dentro de la región.

@@ -16,8 +16,8 @@ de explotar.
 |---|---|
 | `cargo build` (debug) | EXIT 0 · **0 advertencias** |
 | `cargo build --release` | EXIT 0 · `opt-level=3`, `lto=true`, `codegen-units=1`, `panic="abort"` |
-| `cargo test` | **40 / 40 pruebas en verde** · 0 advertencias |
-| `cargo test --release` | **40 / 40** · integración 0.16 s + estrés 1.03 s |
+| `cargo test` | **60 / 60 pruebas en verde** · 0 advertencias · clippy limpio |
+| `cargo test --release` | **60 / 60** · integración 0.13 s + estrés 0.81 s |
 | Dependencias externas | **0** (`Cargo.lock` contiene sólo `bara`) |
 | `unsafe` | **0** (`#![forbid(unsafe_code)]` en `src/lib.rs`) |
 
@@ -38,7 +38,7 @@ oráculo sin volcar antes todo el log del génesis.
 | `src/runtime.rs` | 1131 | Evaluador **Belnap** (`⊤ ⊥ f t`), **autopoiesis** (axiogénesis de raíces desconocidas), **memoria holográfica de entropía 0**, log ontológico, rollback integrado |
 | `src/memory_region.rs` | 290 | Inferencia de **regiones por rangos de vida** (*lifetimes*) y vistas **zero‑copy** CPU/GPU |
 | `src/zk_proof.rs` | 482 | Pipeline **ZK‑SNARK** didáctico sobre `𝔽ₚ` (`P = 2⁶¹ − 1`), Fiat–Shamir |
-| `src/ffi_ingest.rs` | 380 | **Ingesta omnívora** C/Python → AST *Shoresh* (saneamiento, valencia, riesgo) |
+| `src/ffi_ingest.rs` | 1077 | **Ingesta omnívora** C/Python/JSON/TypeScript → AST *Shoresh*: sondeo `detect_lang`, barrido `ingest_auto`, saneamiento, valencia y `BelnapCensus` |
 | `src/temporal_rollback.rs` | 273 | Navegación temporal y **rollback atómico `Δ⁻¹`** (`push`/`pop`/`replace`) |
 | `src/quantum_native.rs` | 955 | **Qubits nativos** `Qubit<\|ψ⟩>`, amplitudes complejas, pares de Bell, colapso determinista |
 | `src/mesh_sync.rs` | 1053 | **Malla global holográfica**: relojes vectoriales, bus en proceso e hilos `std` |
@@ -97,7 +97,7 @@ cargo run --release --bin bara_oracle -- --bare --no-live -s "ברא שמר עב
 # El manifiesto también puede llegar por stdin (`-`)
 type manifests\shoresh_manifest.bara | cargo run --release --bin bara_oracle -- --no-live -
 
-# Suite completa: 30 pruebas de integración + 10 de estrés
+# Suite completa: 33 pruebas de integración + 10 de estrés
 cargo test
 cargo test --release -- --nocapture
 ```
@@ -156,6 +156,27 @@ comentarios `#` (de línea completa o de cola) se descartan, así que el documen
 puede documentarse en prosa sin contaminar el programa compilado. Si el guion
 cierra con `:salir`, la sesión termina ahí (`-f` fuerza el bucle interactivo).
 
+### Muestras conversables (`samples/`)
+
+El repositorio trae **cuatro muestras comentadas** —una por subsistema— que la
+suite de integración conversa de extremo a extremo
+(`sample_manifests_are_conversable_end_to_end`), de modo que también sirven de
+documentación viva:
+
+| Muestra | Qué demuestra |
+|---|---|
+| [`samples/autopoiesis.bara`](samples/autopoiesis.bara) | Tres raíces desconocidas ⇒ tres axiomas sintetizados; la lengua natural enseña verbos nuevos y la generación del mutador crece con ellos |
+| [`samples/quantum.bara`](samples/quantum.bara) | Superposición adaptativa (`חכם`), entrelazamiento `!!`, observación heurística `?` y colapso forzado `!` |
+| [`samples/mesh.bara`](samples/mesh.bara) | Hológrafo global: dos manifestaciones *ex nihilo*, tormenta de contradicciones (`!!`, `*`, `+`) y guarda `שמר` |
+| [`samples/temporal.bara`](samples/temporal.bara) | Deltas reversibles por turno y rollback manual `:deshacer` sobre marcadores vivos |
+
+```bash
+cargo run --release --bin bara_oracle -- samples/autopoiesis.bara
+cargo run --release --bin bara_oracle -- samples/quantum.bara
+cargo run --release --bin bara_oracle -- samples/mesh.bara
+cargo run --release --bin bara_oracle -- samples/temporal.bara
+```
+
 ```text
 $ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
 ── PIPELINE NATIVO · ψ · MALLA · METAL-IR · ZK ───────────────
@@ -179,7 +200,7 @@ $ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
 
 | Archivo | Líneas | Pruebas | Cobertura |
 |---|---:|---:|---|
-| `tests/integration_suite.rs` | 1412 | **30** | léxico, runtime/Belnap, memoria holográfica, autopoiesis, regiones, ZK‑SNARK, FFI, `Δ⁻¹`, cuántica/Bell, malla (bus vs hilos), códec *wire*, Metal‑IR, oráculo REPL, manifiestos, pipeline nativo |
+| `tests/integration_suite.rs` | 1685 | **33** | léxico, runtime/Belnap, memoria holográfica, autopoiesis, regiones, ZK‑SNARK, FFI (C/Python/**JSON/TypeScript** + ingesta omnívora y censo de Belnap), `Δ⁻¹`, cuántica/Bell, malla (bus vs hilos), códec *wire*, Metal‑IR, oráculo REPL, manifiestos, muestras `samples/*.bara`, pipeline nativo |
 | `tests/stress_test.rs` | 596 | **10** | PRNG SplitMix64 propio: inundación de paradojas, rollback profundo, mutación masiva del AST, tormenta de memoria, fuente adversarial, tormenta de conflictos en la malla, tormenta cuántica, presión de Metal‑IR, tormenta FFI, conversación hostil del oráculo |
 
 Los *tests* enlazan el mismo *kernel* (`use bara::…`), por lo que no hay copias

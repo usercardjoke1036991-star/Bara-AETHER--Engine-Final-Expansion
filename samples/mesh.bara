@@ -1,0 +1,32 @@
+# ═══════════════════════════════════════════════════════════════════════
+#  MUESTRA 3 · MALLA HOLOGRÁFICA Y RELOJES VECTORIALES — Bara / AETHER-Ω
+#  La malla sincroniza los peers (primero el bus en proceso y después los
+#  hilos de `std`) y el hológrafo global resume el estado sin perder
+#  ninguna época. `:malla` informa de peers, época, deriva y bytes de wire.
+# ───────────────────────────────────────────────────────────────────────
+#  Ejecución:
+#      cargo run --release --bin bara_oracle -- samples/mesh.bara
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── 0 · fotografía de la malla al abrir la sesión ──────────────────────
+:malla
+:estado
+
+# ── 1 · dos manifestaciones ex nihilo: semilla del hológrafo ───────────
+ברא
+ברא
+
+# ── 2 · tormenta de contradicciones: la malla converge sin colapsar ────
+!!
+*
++
+שפט
+
+# ── 3 · guarda de día-cero: se sella la falsedad antes de sincronizar ──
+שמר
+
+# ── 4 · estado, malla y memoria después de la tormenta ────────────────
+:estado
+:malla
+:memoria
+:salir

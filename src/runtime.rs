@@ -14,6 +14,7 @@
 //!   estados y log ontológico.
 
 use crate::ffi_ingest::{self, IngestedDecl, ShoreshNode};
+use crate::fractal_geometry::FractalLayout;
 use crate::lexer::{Keyword, Token, TokenKind};
 use crate::memory_region::{Device, RegionKind, RegionTable};
 use crate::mesh_sync::{MeshCluster, SyncReport};
@@ -320,6 +321,22 @@ pub struct MemoryNode {
     pub affinity: f64,
 }
 
+/// Ancho lógico del registro de un nodo holográfico, en bytes.
+///
+/// Suma del tamaño fijo del registro —clave topológica (`u64`, 8 B) y afinidad
+/// (`f64`, 8 B)— más el cuerpo del estado (1 B si es clásico, 16 B si lleva dos
+/// masas `f64`) y la etiqueta en UTF‑8. Es una medida **lógica**: el kernel no
+/// direcciona memoria física, sólo decide cómo repartir nodos sin fragmentar
+/// (retícula áurea de [`crate::fractal_geometry`]).
+pub fn node_width(label: &str, state: &QuantumState) -> usize {
+    const FIXED: usize = 8 + 8;
+    let body = match state {
+        QuantumState::Classical(_) => 1,
+        QuantumState::Superposition { .. } | QuantumState::Paraconsistent { .. } => 16,
+    };
+    FIXED + body + label.len()
+}
+
 /// Memoria holográfica **direccionada por contenido**.
 ///
 /// La clave de cada nodo se deriva del contenido (FNV-1a). Al ser una
@@ -327,11 +344,16 @@ pub struct MemoryNode {
 /// y, por tanto, la entropía acumulada es exactamente `0.0`. La memoria se
 /// organiza además por *afinidad topológica*: la distancia de Hamming frente
 /// al haz de reconstrucción mide cuán "cerca" está cada nodo del todo.
+///
+/// El **reparto espacial** de los nodos es una retícula áurea: pasos de
+/// Fibonacci y orden `i·φ` (véase [`HolographicMemory::layout`]).
 #[derive(Debug, Clone, Default)]
 pub struct HolographicMemory {
     nodes: BTreeMap<u64, MemoryNode>,
     index: BTreeMap<String, u64>,
     writes: u64,
+    /// Retícula áurea: `(clave topológica, ancho lógico)` en orden de escritura.
+    grid: Vec<(u64, usize)>,
 }
 
 impl HolographicMemory {
@@ -369,6 +391,9 @@ impl HolographicMemory {
         if self.nodes.contains_key(&key) {
             return key;
         }
+        // Ancho lógico calculado **antes** de mover el estado: alimenta la
+        // retícula áurea que reparte los nodos en el espacio.
+        let width = node_width(label, &state);
         let node = MemoryNode {
             label: label.to_string(),
             key,
@@ -377,6 +402,7 @@ impl HolographicMemory {
         };
         self.nodes.insert(key, node);
         self.index.insert(label.to_string(), key);
+        self.grid.push((key, width));
         self.writes += 1;
         key
     }
@@ -400,6 +426,52 @@ impl HolographicMemory {
     pub fn topological_affinity_to(&self, a: u64, b: u64) -> f64 {
         let hamming = (a ^ b).count_ones();
         1.0 - (hamming as f64) / 64.0
+    }
+
+    /// Reparto espacial (**retícula áurea**) de los nodos retenidos.
+    ///
+    /// Cada nodo recibe una ranura —desplazamiento lógico en bytes— cuyo paso
+    /// es el Fibonacci inmediatamente mayor que su ancho de registro, y el
+    /// orden de ocupación es la secuencia de *phyllotaxis* `i·φ`: nodos
+    /// consecutivos en el tiempo de escritura quedan **lejos** en el espacio
+    /// (propiedad holográfica: el vecino lógico no es el vecino físico). La
+    /// fragmentación resultante queda acotada por `1 − 1/φ ≈ 38.2 %`, frente
+    /// al `50 %` de los cubos potencia de dos.
+    pub fn layout(&self) -> FractalLayout {
+        let widths: Vec<usize> = self.grid.iter().map(|(_, width)| *width).collect();
+        FractalLayout::plan_from(&widths)
+    }
+
+    /// Fragmentación medida de la retícula, en `[0,1)`.
+    pub fn fragmentation(&self) -> f64 {
+        self.layout().fragmentation
+    }
+
+    /// Anchos de registro retenidos, en orden de escritura `(clave, bytes)`.
+    pub fn grid(&self) -> &[(u64, usize)] {
+        &self.grid
+    }
+
+    /// Ranuras áureas de todos los nodos: `(clave topológica, desplazamiento)`.
+    pub fn slots(&self) -> Vec<(u64, u64)> {
+        let layout = self.layout();
+        self.grid
+            .iter()
+            .enumerate()
+            .map(|(position, (key, _))| (*key, layout.slot_of(position).unwrap_or(0)))
+            .collect()
+    }
+
+    /// Ranura áurea del nodo con esta etiqueta, si existe.
+    pub fn slot_of(&self, label: &str) -> Option<u64> {
+        let key = *self.index.get(label)?;
+        self.slot_of_key(key)
+    }
+
+    /// Ranura áurea del nodo con esta clave topológica, si existe.
+    pub fn slot_of_key(&self, key: u64) -> Option<u64> {
+        let position = self.grid.iter().position(|(k, _)| *k == key)?;
+        self.layout().slot_of(position)
     }
 }
 

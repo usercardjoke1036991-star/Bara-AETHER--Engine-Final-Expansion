@@ -1,0 +1,29 @@
+# ═══════════════════════════════════════════════════════════════════════
+#  MUESTRA 2 · TIPOS CUÁNTICOS NATIVOS (Qubit<|ψ⟩>) — Bara / AETHER-Ω
+#  Superposición, entrelazamiento Φ⁺, observación heurística y colapso de
+#  Born. El pipeline nativo (ψ · malla · Metal-IR · ZK) enciende los qubits
+#  «qubit-alef» y «qubit-bet» antes de ceder el control al oráculo, de modo
+#  que `:cuántica` describe máquina real y no un registro vacío.
+# ───────────────────────────────────────────────────────────────────────
+#  Ejecución:
+#      cargo run --release --bin bara_oracle -- samples/quantum.bara
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── 0 · registro cuántico antes de tocar nada ──────────────────────────
+:cuántica
+
+# ── 1 · superposición adaptativa (חכם) y entrelazamiento Φ⁺ (!!) ───────
+חכם
+entrelaza alef con bet
+:cuántica
+
+# ── 2 · observación heurística (?) y colapso forzado de la cumbre (!) ──
+?
+!
+
+# ── 3 · la mitad de un par de Bell es I/2 ⇒ ⊤∧⊥ tolerado, no explosión ─
+עבד
+אמר
+:cuántica
+:estado
+:salir

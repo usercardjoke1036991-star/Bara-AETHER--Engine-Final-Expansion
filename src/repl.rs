@@ -623,14 +623,20 @@ impl<'a> Oracle<'a> {
                     self.runtime.memory.entropy()
                 );
                 for node in self.runtime.memory.nodes() {
+                    let slot = self.runtime.memory.slot_of(&node.label).unwrap_or(0);
                     out.push_str(&format!(
-                        "\n      ❖ «{}» key=0x{:016X} afinidad={:.4} {}",
+                        "\n      ❖ «{}» key=0x{:016X} afinidad={:.4} ranura={} B {}",
                         node.label,
                         node.key,
                         node.affinity,
+                        slot,
                         node.state.label()
                     ));
                 }
+                out.push_str(&format!(
+                    "\n      φ-rejilla: {}",
+                    self.runtime.memory.layout().label()
+                ));
                 out
             }
             MetaCommand::Timeline => {

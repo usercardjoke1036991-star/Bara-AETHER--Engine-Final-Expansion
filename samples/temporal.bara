@@ -1,0 +1,35 @@
+# ═══════════════════════════════════════════════════════════════════════
+#  MUESTRA 4 · NAVEGACIÓN TEMPORAL Y ROLLBACK Δ⁻¹ — Bara / AETHER-Ω
+#  Cada turno del oráculo registra sus deltas reversibles; `:deshacer`
+#  rebobina el último marcador de forma atómica (o todo, o nada). Si la
+#  fusión `!!` llegara a interceptar una paradoja irresoluble, el motor
+#  temporal rebobina solo: la contradicción se tolera, nunca se explota.
+# ───────────────────────────────────────────────────────────────────────
+#  Ejecución:
+#      cargo run --release --bin bara_oracle -- samples/temporal.bara
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── 0 · diario temporal al abrir la sesión ────────────────────────────
+:tiempo
+:estado
+
+# ── 1 · dos turnos reversibles (Δ vivos) ──────────────────────────────
+ברא
+חכם
+:tiempo
+
+# ── 2 · rollback manual Δ⁻¹: el turno desaparece por completo ─────────
+:deshacer
+:tiempo
+
+# ── 3 · fusión paraconsistente (⊤∧⊥): la cima no explota ──────────────
+!!
+עבד
+שפט
+
+# ── 4 · segundo rollback y clausura de la sesión ──────────────────────
+:deshacer
+:deshacer
+:estado
+:tiempo
+:salir

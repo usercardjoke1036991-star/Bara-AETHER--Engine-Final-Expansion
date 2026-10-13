@@ -522,6 +522,193 @@ fn ffi_ingestion_maps_and_sanitizes_legacy_code() {
     assert!(near(valence.belnap().0, 0.0));
 }
 
+#[test]
+fn ffi_ingest_json_and_typescript_dialects_become_shoresh() {
+    // 5.7 JSON: cada clave de primer nivel es un nodo con la **forma** de su
+    // valor (`array` → secuencia, `object` → registro, `bool` → verdad,
+    // `null` → vacío), y los miembros anidados se expanden como parámetros.
+    let json = r#"{
+        "shoresh": "holo",
+        "pilas": [1, 2, 3],
+        "qubit": {"alpha": 0.75, "beta": 0.25},
+        "activo": true,
+        "opaco": null
+    }"#;
+    let decls = ffi_ingest::ingest_json(json);
+    let names: Vec<&str> = decls.iter().map(|decl| decl.name.as_str()).collect();
+    assert_eq!(names, vec!["shoresh", "pilas", "qubit", "activo", "opaco"]);
+    assert!(decls.iter().all(|decl| decl.lang == LegacyLang::Json));
+    assert_eq!(BaraType::from_legacy(&decls[0].ret), BaraType::Text);
+    assert_eq!(decls[1].params.len(), 3, "el arreglo expande sus elementos");
+    assert_eq!(decls[1].params[0].name, "e0");
+    assert_eq!(BaraType::from_legacy(&decls[1].ret), BaraType::List);
+    assert_eq!(decls[2].params.len(), 2, "el objeto expande sus miembros");
+    assert_eq!(decls[2].params[0].name, "alpha");
+    assert_eq!(BaraType::from_legacy(&decls[2].ret), BaraType::Record);
+    assert_eq!(BaraType::from_legacy(&decls[3].ret), BaraType::Truth);
+    assert_eq!(BaraType::from_legacy(&decls[4].ret), BaraType::Void);
+
+    // 5.8 Cotas: un arreglo gigante se resume en un nodo `items` acotado.
+    let wide = ffi_ingest::ingest_json("[1, 2, 3, 4, 5, 6, 7, 8]");
+    assert_eq!(wide.len(), 1);
+    assert_eq!(wide[0].name, "items");
+    assert_eq!(wide[0].params.len(), ffi_ingest::MAX_STRUCT_MEMBERS);
+
+    // 5.9 Un documento ilegible degrada a vacío: la frontera nunca aborta.
+    assert!(ffi_ingest::ingest_json("no soy json").is_empty());
+    assert!(ffi_ingest::ingest_json("{ \"a\" ").is_empty());
+    assert!(ffi_ingest::ingest_json("").is_empty());
+
+    // 5.10 TypeScript: interfaz, función y flecha tipadas en un mismo módulo.
+    let ts = "\
+export interface Qubit { alpha: number; beta: number; etiqueta?: string }
+export async function entangle(a: number, b: number): void {
+declare const collapse = (name: string, forzar: boolean): boolean => true;
+";
+    let mods = ffi_ingest::ingest_typescript(ts);
+    assert_eq!(mods.len(), 3, "interfaz + función + flecha");
+    assert!(mods.iter().all(|decl| decl.lang == LegacyLang::TypeScript));
+    assert_eq!(mods[0].name, "Qubit");
+    assert_eq!(mods[0].params.len(), 3);
+    assert_eq!(mods[0].params[2].name, "etiqueta", "el `?` se despoja");
+    assert_eq!(BaraType::from_legacy(&mods[0].ret), BaraType::Record);
+    assert_eq!(mods[1].name, "entangle");
+    assert_eq!(mods[1].params.len(), 2);
+    assert_eq!(BaraType::from_legacy(&mods[1].ret), BaraType::Void);
+    assert_eq!(mods[2].name, "collapse");
+    assert_eq!(mods[2].params.len(), 2);
+    assert_eq!(BaraType::from_legacy(&mods[2].ret), BaraType::Truth);
+    assert!(ffi_ingest::ingest_typescript("const x = 1; // sin firma").is_empty());
+}
+
+/// Ingiere `source` con el dialecto sondeado y lo traduce a AST *Shoresh*.
+fn ast_of(source: &str) -> (Vec<IngestedDecl>, ffi_ingest::ShoreshAst) {
+    let decls = ffi_ingest::ingest_auto(source);
+    let ast = ffi_ingest::to_shoresh(&decls);
+    (decls, ast)
+}
+
+#[test]
+fn ffi_omnivorous_ingest_probes_dialects_and_censuses_belnap() {
+    // 5.11 Sondeo de dialecto por evidencia positiva.
+    assert_eq!(
+        ffi_ingest::detect_lang("{\"a\": 1}"),
+        Some(LegacyLang::Json)
+    );
+    assert_eq!(
+        ffi_ingest::detect_lang("[1, 2]"),
+        None,
+        "sin comillas no es JSON: ambiguo"
+    );
+    assert_eq!(
+        ffi_ingest::detect_lang("#include <stdio.h>\n"),
+        Some(LegacyLang::C)
+    );
+    assert_eq!(
+        ffi_ingest::detect_lang("def run(fd):\n"),
+        Some(LegacyLang::Python)
+    );
+    assert_eq!(
+        ffi_ingest::detect_lang("export function f(a: number): void {\n"),
+        Some(LegacyLang::TypeScript)
+    );
+    assert_eq!(
+        ffi_ingest::detect_lang("int add(int a);"),
+        Some(LegacyLang::C)
+    );
+    assert_eq!(
+        ffi_ingest::detect_lang("sólo prosa sin nada ingerible"),
+        None
+    );
+    assert_eq!(ffi_ingest::detect_lang("   \n  "), None);
+
+    // 5.12 Barrido canónico: si el dialecto sondeado no produce nada, se
+    // prueban los demás en orden canónico. Una cabecera C con un prototipo
+    // Python dentro se recupera por el barrido en vez de perderse.
+    let hybrid = "#include <stdio.h>\ndef shamar(fd):\n";
+    assert_eq!(ffi_ingest::detect_lang(hybrid), Some(LegacyLang::C));
+    let recovered = ffi_ingest::ingest_auto(hybrid);
+    assert_eq!(recovered.len(), 1);
+    assert_eq!(recovered[0].lang, LegacyLang::Python);
+    assert_eq!(recovered[0].name, "shamar");
+    assert_eq!(ffi_ingest::ingest_auto("sólo prosa sin nada").len(), 0);
+
+    // 5.13 C crudo: un puntero y `malloc` no se rechazan, se sellan.
+    let (c_decls, ast) = ast_of("int add(int a, int b);\nvoid *malloc(size_t n);\n");
+    assert_eq!(c_decls.len(), 2);
+    assert!(c_decls.iter().all(|decl| decl.lang == LegacyLang::C));
+    assert_eq!(ast.nodes.len(), 2);
+    assert_eq!(ast.nodes[0].arity, 2);
+    assert_eq!(ast.nodes[0].ret, BaraType::Number);
+    assert!(!ast.nodes[0].sanitized, "lo inocuo no se sella");
+    assert!(near(ast.nodes[1].hazard, 0.65), "malloc 0.40 + `*` 0.25");
+    assert!(ast.nodes[1].sanitized);
+    assert!(near(ast.hazard_score(), 0.325));
+    assert!(near(ast.hazard_ceiling(), 0.65));
+    assert_eq!(ast.sanitized_count(), 1);
+    assert_eq!(ast.roots().count(), 2);
+    assert!(ast.nodes.iter().all(|node| node.root.chars().count() == 3));
+
+    // 5.14 `eval` en Python: riesgo alto sellado, cero pánico.
+    let (py_decls, py_ast) = ast_of("def eval_node(x):\n");
+    assert_eq!(py_decls[0].lang, LegacyLang::Python);
+    assert_eq!(
+        py_ast.nodes[0].ret,
+        BaraType::Unknown,
+        "Python no declara tipo"
+    );
+    assert!(near(py_ast.nodes[0].hazard, 0.60));
+    assert!(py_ast.nodes[0].sanitized);
+
+    // 5.15 Fusión de AST (nodos del receptor primero) y censo de Belnap.
+    let mut merged = ast.clone();
+    merged.merge(py_ast);
+    assert_eq!(merged.nodes.len(), 3);
+    assert_eq!(merged.nodes[0].original, "add");
+    assert_eq!(merged.nodes[2].original, "eval_node");
+    let census = merged.census();
+    assert_eq!(census.truth, 1, "`add` inocuo: (1.0, 0.0) ⇒ ⊤");
+    assert_eq!(census.falsehood, 2, "sellados ⇒ ⊥");
+    assert_eq!(census.both, 0);
+    assert_eq!(census.neither, 0);
+    assert_eq!(census.total(), merged.nodes.len());
+    assert_eq!(census.contradictions(), 0);
+    assert_eq!(census.label(), "⊤=1 ⊥=2 ⊤∧⊥=0 ∅=0");
+
+    // 5.16 Sello por umbral: la ingesta ya selló lo peligroso, pero un umbral
+    // negativo sella incluso lo inocuo (y sellar dos veces es no-op).
+    assert_eq!(merged.seal_over(0.0), 0, "riesgo 0.0 no supera el umbral");
+    assert_eq!(merged.seal_over(-1.0), 1, "sólo el nodo limpio faltaba");
+    assert_eq!(merged.seal_over(-1.0), 0);
+    assert_eq!(merged.sanitized_count(), 3);
+    assert_eq!(merged.clone().seal_over(2.0), 0, "umbral > 1 no sella nada");
+
+    // 5.17 Riesgo exacto de 0.5: la valencia (0.5, 0.5) es ⊤∧⊥ tolerada.
+    let (_, limbic) = ast_of("int walk(node_entry n); // free -> beyond\n");
+    assert_eq!(limbic.nodes.len(), 1);
+    assert!(near(limbic.nodes[0].hazard, 0.5), "free 0.30 + `->` 0.20");
+    assert!(limbic.nodes[0].valence.is_contradiction());
+    let limbic_census = limbic.census();
+    assert_eq!(limbic_census.both, 1);
+    assert_eq!(limbic_census.label(), "⊤=0 ⊥=0 ⊤∧⊥=1 ∅=0");
+
+    // 5.18 El AST se destila como programa *Shoresh* y el oráculo lo conversa:
+    // el código legado acaba materializándose como axiomas vivos de Bara.
+    let source = merged.to_shoresh_source();
+    assert!(source.starts_with("# AST *Shoresh* destilado por `ffi_ingest`"));
+    assert_eq!(source.matches("שמר").count(), merged.sanitized_count());
+    assert!(source.ends_with("עבד\nאמר\n:estado\n:salir\n"));
+    let expected_turns = bara::manifest_lines(&source).len();
+    let mut runtime = BaraRuntime::new();
+    let report = Oracle::new(&mut runtime).run_manifest(&source);
+    assert_eq!(
+        report.turns, expected_turns,
+        "un turno por línea significativa"
+    );
+    assert!(report.turns >= merged.nodes.len());
+    assert!(!report.roots.is_empty());
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // 6 · Navegación temporal y rollback atómico Δ⁻¹
 // ─────────────────────────────────────────────────────────────────────────
@@ -1409,4 +1596,90 @@ fn runtime_native_pipeline_end_to_end() {
         runtime.certificate.is_none(),
         "sin etapa de compilación explícita"
     );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 12 · Muestras `.bara` del repositorio (manifiestos conversables)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Ruta absoluta de una muestra del repositorio (`BAR/samples/*.bara`).
+fn sample_path(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("samples")
+        .join(name)
+}
+
+/// Lee una muestra del repositorio con un diagnóstico claro si falta.
+fn sample_source(name: &str) -> String {
+    let path = sample_path(name);
+    std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("no se pudo leer {}: {error}", path.display()))
+}
+
+#[test]
+fn sample_manifests_are_conversable_end_to_end() {
+    // 12.1 Las cuatro muestras existen y el oráculo las conversa sin pánicos:
+    // un turno registrado por línea significativa y la pila siempre sana.
+    let names = [
+        "autopoiesis.bara",
+        "quantum.bara",
+        "mesh.bara",
+        "temporal.bara",
+    ];
+    for name in names {
+        let source = sample_source(name);
+        let lines = bara::manifest_lines(&source);
+        assert!(!lines.is_empty(), "{name} no puede estar vacía");
+
+        let mut runtime = BaraRuntime::new();
+        let report = Oracle::new(&mut runtime).run_manifest(&source);
+        assert_eq!(
+            report.turns,
+            lines.len(),
+            "{name}: un turno por línea significativa"
+        );
+        assert!(report.events > 0, "{name}: la sesión deja eventos");
+        assert!(!report.label().is_empty());
+        assert!(runtime.stack.iter().all(state_is_sane));
+    }
+
+    // 12.2 Autopoiesis: la lengua natural sintetiza axiomas que el léxico no
+    // conocía y los axiomas quedan retenidos en la memoria holográfica.
+    let autopoiesis = sample_source("autopoiesis.bara");
+    let mut runtime = BaraRuntime::new();
+    let report = Oracle::new(&mut runtime).run_manifest(&autopoiesis);
+    assert!(
+        report.synthesized >= 3,
+        "el oráculo aprende el idioma nuevo"
+    );
+    assert_eq!(
+        runtime.mutator.generation(),
+        report.synthesized,
+        "la generación crece una vez por axioma sintetizado"
+    );
+    assert!(!runtime.memory.is_empty(), "memoria holográfica poblada");
+
+    // 12.3 Temporal: los `:deshacer` de la muestra revierten deltas reales.
+    let temporal = sample_source("temporal.bara");
+    let mut runtime = BaraRuntime::new();
+    let report = Oracle::new(&mut runtime).run_manifest(&temporal);
+    assert!(report.rollbacks >= 3, "tres `:deshacer` con marca viva");
+    assert!(runtime.timeline.deltas().iter().any(|delta| delta.reverted));
+
+    // 12.4 Cuántica y malla: las muestras tocan los operadores simbólicos y
+    // dejan un log ontológico enteramente descriptible.
+    let quantum = sample_source("quantum.bara");
+    let mut runtime = BaraRuntime::new();
+    let report = Oracle::new(&mut runtime).run_manifest(&quantum);
+    assert!(report.roots.iter().any(|root| root == "!!"));
+    assert!(runtime
+        .log()
+        .iter()
+        .all(|event| !event.describe().is_empty()));
+
+    let mesh = sample_source("mesh.bara");
+    let mut runtime = BaraRuntime::new();
+    let report = Oracle::new(&mut runtime).run_manifest(&mesh);
+    assert!(report.roots.iter().any(|root| root == "ברא"));
+    assert!(report.events > 0);
 }
