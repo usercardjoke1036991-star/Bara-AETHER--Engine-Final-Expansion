@@ -36,12 +36,17 @@
 
 #![forbid(unsafe_code)]
 
+pub mod ast_dna;
+pub mod crypto_native;
+pub mod emission;
 pub mod ffi_ingest;
 pub mod fractal_geometry;
+pub mod immunity_gateway;
 pub mod lexer;
 pub mod memory_region;
 pub mod mesh_sync;
 pub mod metal_ir;
+pub mod net_camouflage;
 pub mod quantum_native;
 pub mod repl;
 pub mod runtime;
