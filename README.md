@@ -16,8 +16,8 @@ de explotar.
 |---|---|
 | `cargo build` (debug) | EXIT 0 · **0 advertencias** |
 | `cargo build --release` | EXIT 0 · `opt-level=3`, `lto=true`, `codegen-units=1`, `panic="abort"` |
-| `cargo test` | **60 / 60 pruebas en verde** · 0 advertencias · clippy limpio |
-| `cargo test --release` | **60 / 60** · integración 0.13 s + estrés 0.81 s |
+| `cargo test` | **96 / 96** en el crate `bara` · **125 / 125** en el workspace (con `bara-ide`) · 0 advertencias · clippy limpio |
+| `cargo test --release` | **96 / 96** · integración 0.01 s + estrés 0.42 s |
 | Dependencias externas | **0** (`Cargo.lock` contiene sólo `bara`) |
 | `unsafe` | **0** (`#![forbid(unsafe_code)]` en `src/lib.rs`) |
 
@@ -35,18 +35,64 @@ oráculo sin volcar antes todo el log del génesis.
 | Módulo | Líneas | Responsabilidad |
 |---|---:|---|
 | `src/lexer.rs` | 388 | Análisis léxico **triconsonántico** total: raíces, *nikud* plegado, `!!` (fusión), invariante ante entradas hostiles |
-| `src/runtime.rs` | 1131 | Evaluador **Belnap** (`⊤ ⊥ f t`), **autopoiesis** (axiogénesis de raíces desconocidas), **memoria holográfica de entropía 0**, log ontológico, rollback integrado |
-| `src/memory_region.rs` | 290 | Inferencia de **regiones por rangos de vida** (*lifetimes*) y vistas **zero‑copy** CPU/GPU |
+| `src/runtime.rs` | 1203 | Evaluador **Belnap** (`⊤ ⊥ f t`), **autopoiesis** (axiogénesis de raíces desconocidas), **memoria holográfica de entropía 0**, log ontológico, rollback integrado |
+| `src/memory_region.rs` | 317 | Inferencia de **regiones por rangos de vida** (*lifetimes*) y vistas **zero‑copy** CPU/GPU |
 | `src/zk_proof.rs` | 482 | Pipeline **ZK‑SNARK** didáctico sobre `𝔽ₚ` (`P = 2⁶¹ − 1`), Fiat–Shamir |
 | `src/ffi_ingest.rs` | 1077 | **Ingesta omnívora** C/Python/JSON/TypeScript → AST *Shoresh*: sondeo `detect_lang`, barrido `ingest_auto`, saneamiento, valencia y `BelnapCensus` |
 | `src/temporal_rollback.rs` | 273 | Navegación temporal y **rollback atómico `Δ⁻¹`** (`push`/`pop`/`replace`) |
 | `src/quantum_native.rs` | 955 | **Qubits nativos** `Qubit<\|ψ⟩>`, amplitudes complejas, pares de Bell, colapso determinista |
 | `src/mesh_sync.rs` | 1053 | **Malla global holográfica**: relojes vectoriales, bus en proceso e hilos `std` |
+| `src/fractal_geometry.rs` | 463 | **Geometría áurea**: Fibonacci exacto y saturante, proporción `φ`, `fib_ceil` y reparto por pasos áureos |
+| `src/crypto_native.rs` | 1238 | **Criptografía nativa**: SHA‑256, HMAC‑SHA‑256, HKDF, ChaCha20, Poly1305, AEAD y X25519 **verificados contra sus RFC** (0 dependencias, 0 `unsafe`) |
+| `src/ast_dna.rs` | 483 | **ADN sintáctico firmado**: serialización canónica del AST *Shoresh*, **raíz de Merkle** y firma `HMAC‑SHA‑256` bajo la clave áurea `golden_key` |
+| `src/emission.rs` | 1577 | **Emisión multiplataforma**: AST → **WASM** portable o **ELF64** real (x86‑64 y AArch64) con LEB128, *Lector* que rechaza instrucciones capaces de atrapar y recibo firmado |
+| `src/immunity_gateway.rs` | 1241 | **Puerta de inmunidad paraconsistente**: ingreso local/TCP, burbujas holográficas aisladas por región, contradicción **absorbida** y ataque neutralizado como ruido inerte |
+| `src/net_camouflage.rs` | 1817 | **Camuflaje de red**: cliente **TLS 1.3** real (ClientHello/ServerHello, calendario de claves, ChaCha20‑Poly1305) cuyo azar y huella derivan del ADN, no del sistema |
 | `src/metal_ir.rs` | 949 | **Metal‑IR**: *layout* abstracto de registros, ISA de 32 bits y **bypass del driver** |
-| `src/repl.rs` | 859 | **Oráculo REPL**: lengua natural → programa *Shoresh*, meta‑comandos, carga de manifiestos |
+| `src/repl.rs` | 865 | **Oráculo REPL**: lengua natural → programa *Shoresh*, meta‑comandos, carga de manifiestos |
 | `src/bin/bara_oracle.rs` | 335 | **Oráculo en vivo**: binario dedicado (pipeline nativo + manifiestos + bucle interactivo) |
-| `src/lib.rs` | 55 | *Crate root*: mapa de módulos, reexportaciones, invariantes |
-| `src/main.rs` | 769 | Génesis de 13 fases + bucle del oráculo |
+| `src/lib.rs` | 64 | *Crate root*: mapa de módulos, reexportaciones, invariantes |
+| `src/main.rs` | 782 | Génesis de 13 fases + bucle del oráculo |
+
+## Capa AETHER‑Ω — emisión, inmunidad y camuflaje
+
+Cinco módulos **exteriores de sólo lectura** sobre el *kernel*: no alteran
+ninguna de las trece fases del génesis, se limitan a leer el AST *Shoresh* y su
+ADN. Todos nacen con **0 dependencias**, **0 `unsafe`** y sin una sola llamada a
+`unwrap()`/`expect()`.
+
+1. **`crypto_native`** — la bóveda autóctona: SHA‑256 (FIPS 180‑4), HMAC‑SHA‑256
+   (RFC 4231), HKDF (RFC 5869), ChaCha20 y Poly1305 (RFC 8439), AEAD y X25519
+   (RFC 7748), cada primitiva contrastada con los vectores de su RFC.
+2. **`ast_dna`** — el AST se serializa de forma canónica, se resume en una **raíz
+   de Merkle** y **nace firmado**: tocar, reordenar o vaciar un nodo invalida el
+   ADN, y la misma semilla humana produce siempre la misma clave (`golden_key`).
+3. **`emission`** — el mismo ADN se emite como **WASM** portable o como **ELF64**
+   ejecutable de verdad (x86‑64 y AArch64); el artefacto lleva el ADN dentro y su
+   *Lector* rechaza toda instrucción capaz de atrapar, de modo que la emisión es
+   determinista y verificable.
+4. **`immunity_gateway`** — puerta **abierta por construcción** (`dropped == 0`,
+   aceptación `1.00`): cada paquete entra en su propia burbuja holográfica, la
+   contradicción se **absorbe** en vez de explotar y el ataque neutralizado se
+   reescribe como **ruido inerte del mismo tamaño**, sin conservar una sola marca
+   reconocible.
+5. **`net_camouflage`** — cliente **TLS 1.3** escrito desde cero sobre `std` cuyo
+   azar sale del ADN y no del sistema operativo: el saludo lleva el relleno exacto
+   del umbral de 512 B, la huella es estable para todo el enjambre y la **marca**
+   viaja en el `session_id` (material aleatorio legítimo) para que cualquier par
+   la verifique en tiempo constante.
+
+### Verificación de la capa
+
+| Suite | Resultado |
+|---|---|
+| `cargo test` (crate `bara`) | **96 / 96** — 45 unitarias + 51 de integración (áureas 8 · integración 33 · estrés 10) |
+| `cargo test --workspace` | **125 / 125** — incluye las 29 de `bara-ide` |
+| Pruebas nuevas | **16** (`immunity_gateway` 8 + `net_camouflage` 8) |
+| `cargo clippy --all-targets --workspace -- -D warnings` | EXIT 0 · **0 avisos** |
+| `cargo fmt --all -- --check` | EXIT 0 · **sin diferencias** |
+| Totalidad (A1) | `src/` **sin `unwrap()` ni `expect()`** |
+| `npm run build` (`bara-ide`) | EXIT 0 — `tsc --noEmit` + `vite build` (43 módulos) |
 
 ## Las 13 fases del génesis
 
@@ -97,7 +143,7 @@ cargo run --release --bin bara_oracle -- --bare --no-live -s "ברא שמר עב
 # El manifiesto también puede llegar por stdin (`-`)
 type manifests\shoresh_manifest.bara | cargo run --release --bin bara_oracle -- --no-live -
 
-# Suite completa: 33 pruebas de integración + 10 de estrés
+# Suite completa: 45 unitarias + 8 áureas + 33 de integración + 10 de estrés
 cargo test
 cargo test --release -- --nocapture
 ```
@@ -202,9 +248,14 @@ $ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
 |---|---:|---:|---|
 | `tests/integration_suite.rs` | 1685 | **33** | léxico, runtime/Belnap, memoria holográfica, autopoiesis, regiones, ZK‑SNARK, FFI (C/Python/**JSON/TypeScript** + ingesta omnívora y censo de Belnap), `Δ⁻¹`, cuántica/Bell, malla (bus vs hilos), códec *wire*, Metal‑IR, oráculo REPL, manifiestos, muestras `samples/*.bara`, pipeline nativo |
 | `tests/stress_test.rs` | 596 | **10** | PRNG SplitMix64 propio: inundación de paradojas, rollback profundo, mutación masiva del AST, tormenta de memoria, fuente adversarial, tormenta de conflictos en la malla, tormenta cuántica, presión de Metal‑IR, tormenta FFI, conversación hostil del oráculo |
+| `tests/fractal_suite.rs` | 330 | **8** | geometría áurea: Fibonacci exacto y saturante, proporción `φ` y `fib_ceil`, serie armónica, reparto por pasos áureos (uniforme y heterogéneo) y orden áureo estable |
 
 Los *tests* enlazan el mismo *kernel* (`use bara::…`), por lo que no hay copias
 divergentes de los tipos: lo que pasa en las pruebas es lo que ejecuta el binario.
+A esas **51** pruebas de integración se suman las **45 unitarias** de `src/**`
+—cripto nativa contra los vectores de sus RFC, ADN firmado, emisión WASM/ELF64,
+puerta de inmunidad y camuflaje TLS—, para un total de **96** en el crate `bara`
+(**125** en el workspace, con `bara-ide`).
 
 ## Salida de ejemplo
 
@@ -241,6 +292,24 @@ sintetizadas.
   `rand`): no hay *property‑testing* sobre entradas aleatorias ni demostrador
   interactivo (Kani/Prusti/Lean), porque implicarían dependencias externas y
   romperían el invariante de **sólo `std`**.
+* La capa **AETHER‑Ω** es **exterior y de sólo lectura**: no altera ninguna de las
+  trece fases del génesis, consume el AST *Shoresh* y su ADN, y nunca escribe en el
+  núcleo.
+* El cliente **TLS 1.3** llega hasta el `ServerHello`: las claves de **aplicación**
+  exigen el tránsito completo hasta `Finished`, así que se entregan como parámetro
+  (`application_keys_with`) en vez de fingir un apretón cerrado.
+* Sólo **ChaCha20‑Poly1305** protege los registros: los `TLS_AES_*` se **ofrecen**
+  en el saludo (para que la huella sea realista), pero no están implementados.
+* El azar de la capa de red es **de identidad** (deriva del ADN con semilla
+  FNV‑1a), no un CSPRNG del sistema: el camuflaje es estable **a propósito**, así
+  que no debe reutilizarse como secreto de sesión único.
+* Las pruebas que abren **zócalos reales** (`TcpIngress`, `HttpsSession`) se omiten
+  sin fallar si el entorno no permite escuchar o conectar.
+* La emisión a **ELF64** produce un ejecutable válido de verdad (x86‑64 y AArch64),
+  pero parte del **Metal‑IR abstracto** ya declarado: no hay ensamblador completo ni
+  enlazador.
+* La neutralización de un ataque convierte su contenido en **ruido inerte del mismo
+  tamaño**; no es un borrado criptográfico del original.
 
 ## Flujo de desarrollo
 
