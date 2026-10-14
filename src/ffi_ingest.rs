@@ -110,6 +110,20 @@ impl BaraType {
         }
     }
 
+    /// Nombre canónico en inglés: el que usa el contrato del lienzo del IDE
+    /// (`visual_builder::bara_type_from_name`), del que es inverso exacto.
+    pub fn name(&self) -> &'static str {
+        match self {
+            BaraType::Number => "number",
+            BaraType::Text => "text",
+            BaraType::Void => "void",
+            BaraType::Truth => "truth",
+            BaraType::List => "list",
+            BaraType::Record => "record",
+            BaraType::Unknown => "unknown",
+        }
+    }
+
     /// Glifo ASCII.
     pub fn glyph(&self) -> &'static str {
         match self {
@@ -229,6 +243,23 @@ impl ShoreshAst {
     /// absorbido después, de modo que el resultado es reproducible.
     pub fn merge(&mut self, other: ShoreshAst) {
         self.nodes.extend(other.nodes);
+    }
+
+    /// Injerta otro AST en la posición `index` (acotada al final).
+    ///
+    /// Devuelve cuántos nodos se injertaron. A diferencia de [`ShoreshAst::merge`],
+    /// el injerto **no** va forzosamente al final: los nodos del receptor se
+    /// parten por `index` y los injertados entran en medio, conservando el orden
+    /// de llegada. Es la operación que usa el constructor visual
+    /// ([`crate::visual_builder`]) para componer lienzos sin depender del azar.
+    /// Un índice mayor que la longitud se acota al final (totalidad).
+    pub fn graft(&mut self, index: usize, other: ShoreshAst) -> usize {
+        let at = index.min(self.nodes.len());
+        let count = other.nodes.len();
+        let mut tail = self.nodes.split_off(at);
+        self.nodes.extend(other.nodes);
+        self.nodes.append(&mut tail);
+        count
     }
 
     /// Sella todos los nodos cuyo riesgo supere `threshold`.

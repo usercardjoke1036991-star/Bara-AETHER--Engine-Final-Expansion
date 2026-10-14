@@ -16,8 +16,8 @@ de explotar.
 |---|---|
 | `cargo build` (debug) | EXIT 0 · **0 advertencias** |
 | `cargo build --release` | EXIT 0 · `opt-level=3`, `lto=true`, `codegen-units=1`, `panic="abort"` |
-| `cargo test` | **96 / 96** en el crate `bara` · **125 / 125** en el workspace (con `bara-ide`) · 0 advertencias · clippy limpio |
-| `cargo test --release` | **96 / 96** · integración 0.01 s + estrés 0.42 s |
+| `cargo test` | **110 / 110** en el crate `bara` · **144 / 144** en el workspace (con `bara-ide`) · 0 advertencias · clippy limpio (`-D warnings`) |
+| `cargo test --release` | **110 / 110** · integración 0.01 s + estrés 0.51 s |
 | Dependencias externas | **0** (`Cargo.lock` contiene sólo `bara`) |
 | `unsafe` | **0** (`#![forbid(unsafe_code)]` en `src/lib.rs`) |
 
@@ -38,20 +38,21 @@ oráculo sin volcar antes todo el log del génesis.
 | `src/runtime.rs` | 1203 | Evaluador **Belnap** (`⊤ ⊥ f t`), **autopoiesis** (axiogénesis de raíces desconocidas), **memoria holográfica de entropía 0**, log ontológico, rollback integrado |
 | `src/memory_region.rs` | 317 | Inferencia de **regiones por rangos de vida** (*lifetimes*) y vistas **zero‑copy** CPU/GPU |
 | `src/zk_proof.rs` | 482 | Pipeline **ZK‑SNARK** didáctico sobre `𝔽ₚ` (`P = 2⁶¹ − 1`), Fiat–Shamir |
-| `src/ffi_ingest.rs` | 1077 | **Ingesta omnívora** C/Python/JSON/TypeScript → AST *Shoresh*: sondeo `detect_lang`, barrido `ingest_auto`, saneamiento, valencia y `BelnapCensus` |
+| `src/ffi_ingest.rs` | 1108 | **Ingesta omnívora** C/Python/JSON/TypeScript → AST *Shoresh*: sondeo `detect_lang`, barrido `ingest_auto`, saneamiento, valencia y `BelnapCensus` |
+| `src/visual_builder.rs` | 1614 | **Constructor visual**: lienzo JSON **estricto** (todo o nada) → AST *Shoresh* validado (aridad, tipos, orden acíclico, riesgo) → **ADN firmado**, con retícula áurea y composición por injerto (`graft`) |
 | `src/temporal_rollback.rs` | 273 | Navegación temporal y **rollback atómico `Δ⁻¹`** (`push`/`pop`/`replace`) |
 | `src/quantum_native.rs` | 955 | **Qubits nativos** `Qubit<\|ψ⟩>`, amplitudes complejas, pares de Bell, colapso determinista |
 | `src/mesh_sync.rs` | 1053 | **Malla global holográfica**: relojes vectoriales, bus en proceso e hilos `std` |
 | `src/fractal_geometry.rs` | 463 | **Geometría áurea**: Fibonacci exacto y saturante, proporción `φ`, `fib_ceil` y reparto por pasos áureos |
-| `src/crypto_native.rs` | 1238 | **Criptografía nativa**: SHA‑256, HMAC‑SHA‑256, HKDF, ChaCha20, Poly1305, AEAD y X25519 **verificados contra sus RFC** (0 dependencias, 0 `unsafe`) |
+| `src/crypto_native.rs` | 1722 | **Criptografía nativa**: SHA‑256, HMAC‑SHA‑256, HKDF, ChaCha20, Poly1305, AEAD y X25519 **verificados contra sus RFC** (0 dependencias, 0 `unsafe`) |
 | `src/ast_dna.rs` | 483 | **ADN sintáctico firmado**: serialización canónica del AST *Shoresh*, **raíz de Merkle** y firma `HMAC‑SHA‑256` bajo la clave áurea `golden_key` |
 | `src/emission.rs` | 1577 | **Emisión multiplataforma**: AST → **WASM** portable o **ELF64** real (x86‑64 y AArch64) con LEB128, *Lector* que rechaza instrucciones capaces de atrapar y recibo firmado |
 | `src/immunity_gateway.rs` | 1241 | **Puerta de inmunidad paraconsistente**: ingreso local/TCP, burbujas holográficas aisladas por región, contradicción **absorbida** y ataque neutralizado como ruido inerte |
-| `src/net_camouflage.rs` | 1817 | **Camuflaje de red**: cliente **TLS 1.3** real (ClientHello/ServerHello, calendario de claves, ChaCha20‑Poly1305) cuyo azar y huella derivan del ADN, no del sistema |
+| `src/net_camouflage.rs` | 2919 | **Camuflaje de red**: cliente **TLS 1.3** real (ClientHello/ServerHello, calendario de claves, ChaCha20‑Poly1305) cuyo azar y huella derivan del ADN, no del sistema |
 | `src/metal_ir.rs` | 949 | **Metal‑IR**: *layout* abstracto de registros, ISA de 32 bits y **bypass del driver** |
 | `src/repl.rs` | 865 | **Oráculo REPL**: lengua natural → programa *Shoresh*, meta‑comandos, carga de manifiestos |
 | `src/bin/bara_oracle.rs` | 335 | **Oráculo en vivo**: binario dedicado (pipeline nativo + manifiestos + bucle interactivo) |
-| `src/lib.rs` | 64 | *Crate root*: mapa de módulos, reexportaciones, invariantes |
+| `src/lib.rs` | 65 | *Crate root*: mapa de módulos, reexportaciones, invariantes |
 | `src/main.rs` | 782 | Génesis de 13 fases + bucle del oráculo |
 
 ## Capa AETHER‑Ω — emisión, inmunidad y camuflaje
@@ -86,13 +87,72 @@ ADN. Todos nacen con **0 dependencias**, **0 `unsafe`** y sin una sola llamada a
 
 | Suite | Resultado |
 |---|---|
-| `cargo test` (crate `bara`) | **96 / 96** — 45 unitarias + 51 de integración (áureas 8 · integración 33 · estrés 10) |
-| `cargo test --workspace` | **125 / 125** — incluye las 29 de `bara-ide` |
-| Pruebas nuevas | **16** (`immunity_gateway` 8 + `net_camouflage` 8) |
+| `cargo test` (crate `bara`) | **110 / 110** — 59 unitarias + 51 de integración (áureas 8 · integración 33 · estrés 10) |
+| `cargo test --workspace` | **144 / 144** — incluye las 34 de `bara-ide` |
+| Pruebas nuevas | **31** (`crypto_native` 12 · `immunity_gateway` 8 · `net_camouflage` 11) |
 | `cargo clippy --all-targets --workspace -- -D warnings` | EXIT 0 · **0 avisos** |
 | `cargo fmt --all -- --check` | EXIT 0 · **sin diferencias** |
 | Totalidad (A1) | `src/` **sin `unwrap()` ni `expect()`** |
-| `npm run build` (`bara-ide`) | EXIT 0 — `tsc --noEmit` + `vite build` (43 módulos) |
+| `npm run build` (`bara-ide`) | EXIT 0 — `tsc --noEmit` + `vite build` (45 módulos) |
+
+## Constructor visual — lienzo → AST *Shoresh* → ADN firmado
+
+`src/visual_builder.rs` es el motor del **constructor visual** del IDE: un lienzo
+JSON **estricto** entra y un módulo *Shoresh* **firmado** sale. No es un sexto
+módulo de la capa AETHER‑Ω (esa capa sólo *lee* el AST): aquí se **construye** un
+AST nuevo con las mismas piezas (raíces, valencia, ADN), así que vive junto a la
+ingesta FFI, de la que reutiliza el mapa de raíces y tipos.
+
+```json
+{
+  "module": "lienzo_genesis",
+  "label": "lienzo-genesis",
+  "blocks": [
+    { "id": "a", "name": "entrada_a", "kind": "source", "arity": 0,
+      "ret": "number", "hazard": 0.0 },
+    { "id": "b", "name": "entrada_b", "kind": "source", "arity": 0,
+      "ret": "number", "hazard": 0.1, "root": "ברא" },
+    { "id": "suma", "name": "sumar", "kind": "transform", "arity": 2,
+      "ret": "number", "hazard": 0.05,
+      "inputs": [{ "index": 0, "type": "number" }, { "index": 1 }] },
+    { "id": "sella", "name": "guardar", "kind": "guard", "arity": 1,
+      "ret": "number", "hazard": 0.2, "inputs": [{ "index": 2 }] },
+    { "id": "emite", "name": "emitir", "kind": "sink", "arity": 1,
+      "ret": "void", "hazard": 0.0, "inputs": [{ "index": 3 }] }
+  ]
+}
+```
+
+* **Contrato estricto de todo o nada** — claves desconocidas o repetidas,
+  números mal formados, un `id` fuera de `[A-Za-z0-9_-]{1,64}` o repetido, un
+  tipo fuera del catálogo (`number` `text` `void` `truth` `list` `record`
+  `unknown`, en inglés o en hebreo), una aridad que no cuadra con las ranuras o
+  una referencia **hacia delante** invalidan el lienzo entero (`None`): el IDE
+  puede entonces señalar el error en lugar de compilar una mentira a medias.
+* **Qué decide el kernel** (no el lienzo ni el IDE): la **aridad** (una fuente no
+  recibe nada; el resto, exactamente `arity` ranuras), la **compatibilidad de
+  tipos** (`unknown` es comodín, como en la ingesta FFI), el **orden** (las
+  aristas sólo miran hacia atrás, así que el grafo es acíclico *por
+  construcción*), el **riesgo** — media, máximo y la **cota áurea del peor caso**
+  `máximo + (máximo − mínimo)/φ` saturada a `1` —, la **retícula** de Fermat
+  (`r_k = √k`, `θ_k = k·2π/φ²`, con `d_min` medida y radio acotado) y el
+  **sellado** (nace bajo `שמר` toda guarda y todo nodo con `hazard > 0.5`).
+  `root` es opcional: si falta, la raíz triconsonántica se deriva del nombre con
+  el mismo mapa que la ingesta; si viene, se exige triconsonántica.
+* **La salida**: el AST *Shoresh* (un nodo por bloque, con valencia
+  `(1 − hazard, hazard)`), su **ADN firmado** — raíz de Merkle + firma
+  `HMAC‑SHA‑256` bajo la clave que reciba el constructor — y el guion listo para
+  el oráculo: cada bloque emite su raíz, los sellados añaden `שמר`, los
+  sumideros `אמר`, y el programa cierra con `עבד`, `:estado` y `:salir`.
+* **Composición** (`build_composed`): los AST de varios lienzos se **injertan**
+  en orden con `ShoreshAst::graft`; la etiqueta firmada es la del primero con el
+  sufijo `:compuesto` y la raíz de Merkle depende de la secuencia, de modo que el
+  resultado es reproducible y el orden nunca es azaroso.
+* **Cotas revalidadas en el kernel**: ≤ 256 bloques, ≤ 64 KiB de lienzo,
+  profundidad JSON ≤ 32, `id` ≤ 64 caracteres, celda ≥ 0.28 de distancia.
+* **Pruebas**: 8 unitarias propias (`visual_builder`), dentro de las 59 del
+  crate. El panel del IDE que lo consume se documenta en
+  `bara-ide/docs/VISUAL_BUILDER.md`.
 
 ## Las 13 fases del génesis
 
@@ -143,7 +203,8 @@ cargo run --release --bin bara_oracle -- --bare --no-live -s "ברא שמר עב
 # El manifiesto también puede llegar por stdin (`-`)
 type manifests\shoresh_manifest.bara | cargo run --release --bin bara_oracle -- --no-live -
 
-# Suite completa: 45 unitarias + 8 áureas + 33 de integración + 10 de estrés
+# Suite completa: 59 unitarias + 8 áureas + 33 de integración + 10 de estrés
+# (110 en el crate `bara`; 144 en el workspace, con las 34 de `bara-ide`)
 cargo test
 cargo test --release -- --nocapture
 ```
@@ -252,10 +313,11 @@ $ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
 
 Los *tests* enlazan el mismo *kernel* (`use bara::…`), por lo que no hay copias
 divergentes de los tipos: lo que pasa en las pruebas es lo que ejecuta el binario.
-A esas **51** pruebas de integración se suman las **45 unitarias** de `src/**`
-—cripto nativa contra los vectores de sus RFC, ADN firmado, emisión WASM/ELF64,
-puerta de inmunidad y camuflaje TLS—, para un total de **96** en el crate `bara`
-(**125** en el workspace, con `bara-ide`).
+A esas **51** pruebas de integración se suman las **59 unitarias** de `src/**`
+—léxico, runtime, memoria regional, ZK, cripto nativa contra los vectores de sus
+RFC, ADN firmado, emisión WASM/ELF64, puerta de inmunidad, camuflaje TLS, ingesta
+FFI, geometría áurea y constructor visual—, para un total de **110** en el crate
+`bara` (**144** en el workspace, con las **34** de `bara-ide`).
 
 ## Salida de ejemplo
 
@@ -287,11 +349,11 @@ sintetizadas.
   física: la intención es reproducibilidad total.
 * El códec *wire* es bit‑exacto para estados clásicos y paraconsistentes; las
   superposiciones se **renormalizan** al decodificar.
-* La verificación es **determinista por casos** (40 axiomas ejecutables + 10
-  arneses de estrés con generador SplitMix64 propio y **semilla fija**, sin
-  `rand`): no hay *property‑testing* sobre entradas aleatorias ni demostrador
-  interactivo (Kani/Prusti/Lean), porque implicarían dependencias externas y
-  romperían el invariante de **sólo `std`**.
+* La verificación es **determinista por casos** (33 axiomas de integración, 8
+  áureos y 10 arneses de estrés con generador SplitMix64 propio y **semilla
+  fija**, sin `rand`): no hay *property‑testing* sobre entradas aleatorias ni
+  demostrador interactivo (Kani/Prusti/Lean), porque implicarían dependencias
+  externas y romperían el invariante de **sólo `std`**.
 * La capa **AETHER‑Ω** es **exterior y de sólo lectura**: no altera ninguna de las
   trece fases del génesis, consume el AST *Shoresh* y su ADN, y nunca escribe en el
   núcleo.

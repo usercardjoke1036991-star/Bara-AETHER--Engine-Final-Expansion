@@ -734,6 +734,337 @@ pub fn aead_open(key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], sealed: &[u8]) ->
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// AES-128 (FIPS 197) · AEAD AES-128-GCM (NIST SP 800-38D)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Bytes de la clave de AES-128.
+pub const AES128_KEY: usize = 16;
+/// Bytes de un bloque AES.
+pub const AES_BLOCK: usize = 16;
+/// Bytes de la expansión de clave de AES-128: 11 claves de ronda.
+pub const AES128_SCHEDULE: usize = 176;
+/// Longitud de la etiqueta de GCM, en bytes.
+pub const GCM_TAG: usize = 16;
+
+/// Caja de sustitución de AES-128 (`S[byte]`, FIPS 197 §5.1.1).
+///
+/// Se escribe como datos —no se computa—: la tabla es un estándar publicado y
+/// así no hay ninguna ruta de código que pueda equivocarse al derivarla.
+const AES_SBOX: [u8; 256] = [
+    0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+    0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
+    0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
+    0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
+    0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
+    0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
+    0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
+    0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
+    0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
+    0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
+    0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+    0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
+    0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
+    0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
+    0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
+    0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16,
+];
+
+/// Multiplica por `x` en `𝔽₂[x]/(x⁸ + x⁴ + x³ + x + 1)` (FIPS 197 §4.2.1).
+fn aes_xtime(byte: u8) -> u8 {
+    // El desplazamiento ya es de 8 bits (`u8`), así que la máscara `0xff` sería
+    // una operación identidad y clippy la rechaza (`identity_op`).
+    (byte << 1) ^ (((byte >> 7) & 1) * 0x1b)
+}
+
+/// `SubBytes`: substitución byte a byte por la caja `S`.
+fn sub_bytes(state: &mut [u8; AES_BLOCK]) {
+    for byte in state.iter_mut() {
+        if let Some(mapped) = AES_SBOX.get(usize::from(*byte)) {
+            *byte = *mapped;
+        }
+    }
+}
+
+/// `ShiftRows`: rotación a la izquierda de cada fila por su índice de fila.
+fn shift_rows(state: &mut [u8; AES_BLOCK]) {
+    let previous = *state;
+    for column in 0..4 {
+        for row in 0..4 {
+            // El byte `(fila, columna)` toma el de la columna `(columna + fila)`.
+            let source = 4 * ((column + row) % 4) + row;
+            if let (Some(slot), Some(byte)) =
+                (state.get_mut(4 * column + row), previous.get(source))
+            {
+                *slot = *byte;
+            }
+        }
+    }
+}
+
+/// `MixColumns`: multiplica cada columna por el polinomio `03 01 01 02`.
+fn mix_columns(state: &mut [u8; AES_BLOCK]) {
+    let previous = *state;
+    for column in 0..4 {
+        let mut bytes = [0u8; 4];
+        for (row, slot) in bytes.iter_mut().enumerate() {
+            if let Some(byte) = previous.get(4 * column + row) {
+                *slot = *byte;
+            }
+        }
+        let doubled = [
+            aes_xtime(bytes[0]),
+            aes_xtime(bytes[1]),
+            aes_xtime(bytes[2]),
+            aes_xtime(bytes[3]),
+        ];
+        let mixed = [
+            doubled[0] ^ doubled[1] ^ bytes[1] ^ bytes[2] ^ bytes[3],
+            bytes[0] ^ doubled[1] ^ doubled[2] ^ bytes[2] ^ bytes[3],
+            bytes[0] ^ bytes[1] ^ doubled[2] ^ doubled[3] ^ bytes[3],
+            doubled[0] ^ bytes[0] ^ bytes[1] ^ bytes[2] ^ doubled[3],
+        ];
+        for (row, byte) in mixed.iter().enumerate() {
+            if let Some(slot) = state.get_mut(4 * column + row) {
+                *slot = *byte;
+            }
+        }
+    }
+}
+
+/// `AddRoundKey`: suma (XOR) la clave de ronda correspondiente.
+fn add_round_key(state: &mut [u8; AES_BLOCK], schedule: &[u8; AES128_SCHEDULE], round: usize) {
+    for (index, byte) in state.iter_mut().enumerate() {
+        if let Some(key) = schedule.get(round * AES_BLOCK + index) {
+            *byte ^= *key;
+        }
+    }
+}
+
+/// Rondas de AES-128 (FIPS 197): 10 rondas + la suma inicial de clave.
+pub const AES128_ROUNDS: usize = 10;
+
+/// Cifrador de bloque **AES-128** con su calendario de claves expandido.
+///
+/// Sólo implementa el cifrado (el camuflaje nunca descifra con AES: deriva la
+/// clave de sesión y sella registros), y no expone ninguna operación que pueda
+/// abortar: cualquier `&[u8]` de otra longitud se rechaza con `None`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Aes128 {
+    /// Once claves de ronda consecutivas de 16 bytes (FIPS 197 §5.2).
+    schedule: [u8; AES128_SCHEDULE],
+}
+
+impl Aes128 {
+    /// Expande la clave de 128 bits (FIPS 197 §5.2).
+    pub fn new(key: &[u8; AES128_KEY]) -> Self {
+        let mut schedule = [0u8; AES128_SCHEDULE];
+        schedule[..AES128_KEY].copy_from_slice(key);
+        let mut rcon = 1u8;
+        let mut at = AES128_KEY;
+        while at < AES128_SCHEDULE {
+            let mut word = [
+                schedule[at - 4],
+                schedule[at - 3],
+                schedule[at - 2],
+                schedule[at - 1],
+            ];
+            if at.is_multiple_of(AES128_KEY) {
+                // RotWord ‖ SubWord ‖ Rcon, sólo en la primera palabra de ronda.
+                word = [word[1], word[2], word[3], word[0]];
+                for slot in word.iter_mut() {
+                    *slot = AES_SBOX.get(usize::from(*slot)).copied().unwrap_or(*slot);
+                }
+                word[0] ^= rcon;
+                rcon = aes_xtime(rcon);
+            }
+            for (index, byte) in word.iter().enumerate() {
+                // La palabra previa está siempre dentro del calendario; el
+                // destino también porque el bucle termina en `at = 172`.
+                let previous = schedule[at - AES128_KEY + index];
+                if let Some(slot) = schedule.get_mut(at + index) {
+                    *slot = previous ^ *byte;
+                }
+            }
+            at += 4;
+        }
+        Aes128 { schedule }
+    }
+
+    /// Cifra un bloque de 16 bytes (FIPS 197 §5.1).
+    ///
+    /// El estado se dispone por columnas, como manda el estándar: el byte `i`
+    /// del bloque es la fila `i % 4` de la columna `i / 4`.
+    pub fn encrypt_block(&self, block: &[u8; AES_BLOCK]) -> [u8; AES_BLOCK] {
+        let mut state = *block;
+        add_round_key(&mut state, &self.schedule, 0);
+        for round in 1..AES128_ROUNDS {
+            sub_bytes(&mut state);
+            shift_rows(&mut state);
+            mix_columns(&mut state);
+            add_round_key(&mut state, &self.schedule, round);
+        }
+        sub_bytes(&mut state);
+        shift_rows(&mut state);
+        add_round_key(&mut state, &self.schedule, AES128_ROUNDS);
+        state
+    }
+
+    /// Deriva un cifrador de un material de clave de longitud arbitraria.
+    ///
+    /// Devuelve `None` si el material no mide exactamente 16 bytes: el núcleo
+    /// nunca recorta ni rellena una clave en silencio (totalidad declarada).
+    pub fn from_key_material(material: &[u8]) -> Option<Self> {
+        let key = <[u8; AES128_KEY]>::try_from(material).ok()?;
+        Some(Aes128::new(&key))
+    }
+}
+
+/// Polinomio de reducción de GCM: `R = 11100001 ‖ 0¹²⁰` (SP 800-38D §6.3).
+const GCM_R: u128 = 0xe1 << 120;
+
+/// Lee un bloque de 16 bytes como entero de 128 bits, en orden de red.
+fn digest_to_u128(bytes: &[u8]) -> u128 {
+    let mut block = [0u8; AES_BLOCK];
+    for (slot, byte) in block.iter_mut().zip(bytes.iter()) {
+        *slot = *byte;
+    }
+    u128::from_be_bytes(block)
+}
+
+/// Multiplica dos elementos de `GF(2¹²⁸)` con la convención de GCM.
+///
+/// El bit 127 es el coeficiente de `x⁰`, así que el recorrido empieza por el
+/// bit más significativo y reduce con `R` cuando el desplazamiento desborda: es
+/// exactamente el algoritmo *Multiply* de SP 800-38D §6.3 (sin tablas, para no
+/// añadir estado compartido al kernel).
+fn gcm_multiply(left: u128, right: u128) -> u128 {
+    let mut product = 0u128;
+    let mut value = right;
+    for bit in 0..128 {
+        if (left >> (127 - bit)) & 1 == 1 {
+            product ^= value;
+        }
+        let carry = value & 1;
+        value >>= 1;
+        if carry == 1 {
+            value ^= GCM_R;
+        }
+    }
+    product
+}
+
+/// `GHASH`: autentica una secuencia de bloques, rellenando a 16 bytes.
+///
+/// Los datos ya llegan con los rellenos y las longitudes que exige el modo; la
+/// función sólo los consume en bloques de 16 bytes (`(X_i ⊕ B_i) · H`).
+fn ghash(key: u128, message: &[u8]) -> u128 {
+    let mut digest = 0u128;
+    let mut padded = message.to_vec();
+    pad_to_16(&mut padded);
+    for chunk in padded.chunks(AES_BLOCK) {
+        digest = gcm_multiply(digest ^ digest_to_u128(chunk), key);
+    }
+    digest
+}
+
+/// `inc32`: incrementa módulo `2³²` el contador de 32 bits final del bloque.
+fn inc32(counter: u128) -> u128 {
+    let low = ((counter & 0xffff_ffff) as u32).wrapping_add(1);
+    (counter & !0xffff_ffffu128) | u128::from(low)
+}
+
+/// Prepara el cifrador y los valores fijos del modo: `H = E_K(0¹²⁸)` y `J₀`.
+///
+/// Para un `nonce` de 96 bits —el que usa el camuflaje— `J₀ = nonce ‖ 0³² ‖ 1`.
+fn gcm_setup(key: &[u8], nonce: &[u8; 12]) -> Option<(Aes128, u128, u128)> {
+    let cipher = Aes128::from_key_material(key)?;
+    let h = digest_to_u128(&cipher.encrypt_block(&[0u8; AES_BLOCK]));
+    let mut j0 = [0u8; AES_BLOCK];
+    j0[..12].copy_from_slice(nonce);
+    j0[AES_BLOCK - 1] = 1;
+    Some((cipher, h, u128::from_be_bytes(j0)))
+}
+
+/// Aplica el flujo del contador de GCM: **su propio inverso** (XOR).
+fn gcm_stream(cipher: &Aes128, j0: u128, data: &mut [u8]) {
+    let mut counter = j0;
+    for chunk in data.chunks_mut(AES_BLOCK) {
+        counter = inc32(counter);
+        let block = cipher.encrypt_block(&counter.to_be_bytes());
+        for (byte, stream) in chunk.iter_mut().zip(block.iter()) {
+            *byte ^= *stream;
+        }
+    }
+}
+
+/// Etiqueta `T = E_K(J₀) ⊕ GHASH_H(A ‖ pad ‖ C ‖ pad ‖ len(A) ‖ len(C))`.
+fn gcm_tag(cipher: &Aes128, h: u128, j0: u128, aad: &[u8], ciphertext: &[u8]) -> [u8; GCM_TAG] {
+    let mut authenticated = Vec::with_capacity(aad.len() + ciphertext.len() + 2 * AES_BLOCK);
+    authenticated.extend_from_slice(aad);
+    pad_to_16(&mut authenticated);
+    authenticated.extend_from_slice(ciphertext);
+    pad_to_16(&mut authenticated);
+    authenticated.extend_from_slice(&(aad.len() as u64).wrapping_mul(8).to_be_bytes());
+    authenticated.extend_from_slice(&(ciphertext.len() as u64).wrapping_mul(8).to_be_bytes());
+    let mask = digest_to_u128(&cipher.encrypt_block(&j0.to_be_bytes()));
+    (ghash(h, &authenticated) ^ mask).to_be_bytes()
+}
+
+/// ¿Coincide la etiqueta calculada con la recibida? (recorrido completo)
+fn gcm_tag_matches(expected: &[u8; GCM_TAG], received: &[u8]) -> bool {
+    let mut difference = if received.len() == GCM_TAG { 0u8 } else { 1u8 };
+    for (index, byte) in expected.iter().enumerate() {
+        let other = received.get(index).copied().unwrap_or(0);
+        difference |= byte ^ other;
+    }
+    difference == 0
+}
+
+/// **AEAD `AES-128-GCM`** (NIST SP 800-38D): sella y autentica en una pasada.
+///
+/// Devuelve `cifrado ‖ etiqueta` (16 bytes de etiqueta) o `None` si la clave no
+/// mide 16 bytes. La `nonce` es de 96 bits, como exige el perfil de TLS 1.3; el
+/// `aad` es la cabecera del registro, que viaja en claro pero autenticada.
+///
+/// Es el AEAD que activa la paridad con `TLS_AES_128_GCM_SHA256` sin depender de
+/// ninguna biblioteca externa: el cifrador de bloque es [`Aes128`] y `GHASH` se
+/// calcula aquí mismo.
+pub fn aes128_gcm_seal(
+    key: &[u8],
+    nonce: &[u8; 12],
+    aad: &[u8],
+    plaintext: &[u8],
+) -> Option<Vec<u8>> {
+    let (cipher, h, j0) = gcm_setup(key, nonce)?;
+    let mut sealed = plaintext.to_vec();
+    gcm_stream(&cipher, j0, &mut sealed);
+    let tag = gcm_tag(&cipher, h, j0, aad, &sealed);
+    sealed.extend_from_slice(&tag);
+    Some(sealed)
+}
+
+/// Abre un mensaje sellado con [`aes128_gcm_seal`], o `None` si es inconsistente.
+///
+/// La etiqueta se contrasta **antes** de devolver un solo byte de texto claro y
+/// el contraste recorre los 16 bytes siempre (tiempo constante): un registro
+/// manipulado no filtra por dónde iba bien.
+pub fn aes128_gcm_open(key: &[u8], nonce: &[u8; 12], aad: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+    let (cipher, h, j0) = gcm_setup(key, nonce)?;
+    if sealed.len() < GCM_TAG {
+        return None;
+    }
+    let split = sealed.len() - GCM_TAG;
+    let (ciphertext, tag) = sealed.split_at(split);
+    let expected = gcm_tag(&cipher, h, j0, aad, ciphertext);
+    if !gcm_tag_matches(&expected, tag) {
+        return None;
+    }
+    let mut plaintext = ciphertext.to_vec();
+    gcm_stream(&cipher, j0, &mut plaintext);
+    Some(plaintext)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // X25519 · Curve25519 (RFC 7748)
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -1053,6 +1384,159 @@ mod tests {
             *slot = *value;
         }
         out
+    }
+
+    /// Empaqueta un vector hexadecimal de 16 bytes.
+    fn bytes16(text: &str) -> [u8; 16] {
+        let bytes = hex(text);
+        let mut out = [0u8; 16];
+        for (slot, value) in out.iter_mut().zip(bytes.iter()) {
+            *slot = *value;
+        }
+        out
+    }
+
+    /// Vector C.1 de FIPS 197: la prueba de referencia del cifrador de bloque.
+    #[test]
+    fn aes128_coincide_con_fips_197() {
+        // Apéndice C.1: clave `000102…0f`, bloque `00112233…ff`.
+        let cipher = Aes128::new(&bytes16("000102030405060708090a0b0c0d0e0f"));
+        assert_eq!(
+            cipher
+                .encrypt_block(&bytes16("00112233445566778899aabbccddeeff"))
+                .to_vec(),
+            hex("69c4e0d86a7b0430d8cdb78070b4c55a")
+        );
+
+        // Apéndice B: el ejemplo «legendario» del estándar.
+        let cipher = Aes128::new(&bytes16("2b7e151628aed2a6abf7158809cf4f3c"));
+        assert_eq!(
+            cipher
+                .encrypt_block(&bytes16("3243f6a8885a308d313198a2e0370734"))
+                .to_vec(),
+            hex("3925841d02dc09fbdc118597196a0b32")
+        );
+
+        // El calendario de claves es determinista y reproducible.
+        assert_eq!(Aes128::new(&[0u8; 16]), Aes128::new(&[0u8; 16]));
+        // Y el material de clave sólo se acepta con la longitud exacta.
+        assert!(Aes128::from_key_material(&[0u8; 15]).is_none());
+        assert!(Aes128::from_key_material(&[0u8; 17]).is_none());
+        assert!(Aes128::from_key_material(&[0u8; 16]).is_some());
+    }
+
+    /// Vectores de McGrew‑Viega / NIST para `AES-128-GCM` (casos 1 a 4).
+    #[test]
+    fn aes128_gcm_coincide_con_los_vectores_nist() {
+        let zero_key = [0u8; 16];
+        let zero_nonce = [0u8; 12];
+
+        // Caso 1: texto claro vacío ⇒ sólo la etiqueta.
+        let sealed = aes128_gcm_seal(&zero_key, &zero_nonce, &[], &[]);
+        assert_eq!(
+            sealed.as_deref(),
+            Some(&hex("58e2fccefa7e3061367f1d57a4e7455a")[..])
+        );
+
+        // Caso 2: un bloque nulo descubierto antes de autenticarlo.
+        let sealed = aes128_gcm_seal(&zero_key, &zero_nonce, &[], &[0u8; 16]);
+        assert_eq!(
+            sealed.as_deref(),
+            Some(&hex("0388dace60b6a392f328c2b971b2fe78ab6e47d42cec13bdf53a67b21257bddf")[..])
+        );
+
+        // Caso 3: 64 bytes de texto claro con su etiqueta.
+        let key = hex("feffe9928665731c6d6a8f9467308308");
+        let nonce = nonce12("cafebabefacedbaddecaf888");
+        let plaintext = hex(
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72\
+             1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b391aafd255",
+        );
+        let sealed = aes128_gcm_seal(&key, &nonce, &[], &plaintext);
+        assert_eq!(
+            sealed.as_deref(),
+            Some(
+                &hex(
+                    "42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e\
+                     21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091473f5985\
+                     4d5c2af327cd64a62cf35abd2ba6fab4",
+                )[..]
+            )
+        );
+
+        // Caso 4: 60 bytes con datos autenticados adicionales (el `aad` pesa).
+        let aad = hex("feedfacedeadbeeffeedfacedeadbeefabaddad2");
+        let plaintext = hex(
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72\
+             1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+        );
+        let sealed = aes128_gcm_seal(&key, &nonce, &aad, &plaintext);
+        assert_eq!(
+            sealed.as_deref(),
+            Some(
+                &hex(
+                    "42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e\
+                     21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091\
+                     5bc94fbc3221a5db94fae95ae7121a47",
+                )[..]
+            )
+        );
+
+        // Sellar y abrir es la identidad, también con longitudes irregulares.
+        for length in [0usize, 1, 15, 16, 17, 63, 64, 65, 255] {
+            let text: Vec<u8> = (0..length).map(|index| (index * 7 + 3) as u8).collect();
+            let sealed = aes128_gcm_seal(&key, &nonce, &aad, &text);
+            assert!(sealed.is_some());
+            let Some(sealed) = sealed else { continue };
+            assert_eq!(sealed.len(), length + GCM_TAG);
+            assert_eq!(aes128_gcm_open(&key, &nonce, &aad, &sealed), Some(text));
+        }
+    }
+
+    #[test]
+    fn aes128_gcm_rechaza_manipulaciones_y_claves_ajenas() {
+        let key = bytes16("feffe9928665731c6d6a8f9467308308");
+        let nonce = nonce12("cafebabefacedbaddecaf888");
+        let aad = b"cabecera del registro";
+        let sealed = aes128_gcm_seal(&key, &nonce, aad, b"soberania del nodo");
+        assert!(sealed.is_some());
+        let Some(sealed) = sealed else { return };
+        assert_eq!(
+            aes128_gcm_open(&key, &nonce, aad, &sealed).as_deref(),
+            Some(&b"soberania del nodo"[..])
+        );
+
+        // Un bit en la etiqueta rompe la autenticación.
+        let mut tag_touched = sealed.clone();
+        let last = tag_touched.len() - 1;
+        tag_touched[last] ^= 0x01;
+        assert!(aes128_gcm_open(&key, &nonce, aad, &tag_touched).is_none());
+
+        // Un bit en el cifrado también.
+        let mut body_touched = sealed.clone();
+        body_touched[0] ^= 0x80;
+        assert!(aes128_gcm_open(&key, &nonce, aad, &body_touched).is_none());
+
+        // El `aad` está autenticado: cambiarlo invalida la apertura.
+        assert!(aes128_gcm_open(&key, &nonce, b"otra cabecera", &sealed).is_none());
+
+        // Otra `nonce` (mismo texto, distinto mensaje) tampoco abre.
+        let other_nonce = nonce12("cafebabefacedbaddecaf889");
+        assert!(aes128_gcm_open(&key, &other_nonce, aad, &sealed).is_none());
+
+        // Otra clave tampoco, y una clave de longitud distinta se rechaza.
+        let other_key = bytes16("00000000000000000000000000000000");
+        assert!(aes128_gcm_open(&other_key, &nonce, aad, &sealed).is_none());
+        assert!(aes128_gcm_seal(&key[..15], &nonce, aad, b"x").is_none());
+        let long_key = [0u8; 17];
+        assert!(aes128_gcm_open(&long_key[..], &nonce, aad, &sealed).is_none());
+
+        // Sellar dos veces con la misma entrada da el mismo resultado y no toca
+        // el texto claro del llamante.
+        let again = aes128_gcm_seal(&key, &nonce, aad, b"soberania del nodo");
+        assert_eq!(again, Some(sealed.clone()));
+        // Un mensaje sellado truncado por debajo de la etiqueta no abre.
+        assert!(aes128_gcm_open(&key, &nonce, aad, &sealed[..GCM_TAG - 1]).is_none());
     }
 
     #[test]

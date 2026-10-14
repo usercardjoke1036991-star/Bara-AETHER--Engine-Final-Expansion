@@ -49,8 +49,8 @@ use std::time::Duration;
 
 use crate::ast_dna::{golden_key, short_hex};
 use crate::crypto_native::{
-    aead_open, aead_seal, chacha20_block, digest_eq, hkdf_expand, hkdf_extract, hmac_sha256,
-    sha256, x25519, x25519_base, AEAD_TAG,
+    aead_open, aead_seal, aes128_gcm_open, aes128_gcm_seal, chacha20_block, digest_eq, hkdf_expand,
+    hkdf_extract, hmac_sha256, sha256, x25519, x25519_base, AEAD_TAG,
 };
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -70,6 +70,15 @@ pub const CT_APPLICATION_DATA: u8 = 23;
 pub const HS_CLIENT_HELLO: u8 = 1;
 /// Mensaje de apretón de manos: `ServerHello`.
 pub const HS_SERVER_HELLO: u8 = 2;
+/// Mensaje de apretón de manos: `EncryptedExtensions`.
+pub const HS_ENCRYPTED_EXTENSIONS: u8 = 8;
+/// Mensaje de apretón de manos: `Certificate` (no se inspecciona: la cadena de
+/// una autoridad ajena no decide la soberanía del nodo).
+pub const HS_CERTIFICATE: u8 = 11;
+/// Mensaje de apretón de manos: `CertificateVerify`.
+pub const HS_CERTIFICATE_VERIFY: u8 = 15;
+/// Mensaje de apretón de manos: `Finished`.
+pub const HS_FINISHED: u8 = 20;
 
 /// Versión heredada que se anuncia en la cabecera y en los saludos.
 pub const LEGACY_VERSION: u16 = 0x0303;
@@ -86,6 +95,46 @@ pub const TLS_AES_256_GCM_SHA384: u16 = 0x1302;
 pub const TLS_CHACHA20_POLY1305_SHA256: u16 = 0x1303;
 /// `TLS_AES_128_CCM_SHA256`.
 pub const TLS_AES_128_CCM_SHA256: u16 = 0x1304;
+
+/// Bytes de la clave de `TLS_AES_128_GCM_SHA256`.
+pub const SUITE_AES128_KEY: usize = 16;
+/// Bytes de la clave de `TLS_CHACHA20_POLY1305_SHA256`.
+pub const SUITE_CHACHA_KEY: usize = 32;
+/// Bytes del vector de inicialización de las dos suites (RFC 8446 §7.3).
+pub const SUITE_IV: usize = 12;
+/// Bytes del `verify_data` del `Finished` (igual al digest de SHA‑256).
+pub const FINISHED_LEN: usize = 32;
+
+/// Longitud de la clave de una suite, o `None` si Bara no la implementa.
+///
+/// La paridad con Internet se declara **explicitamente**: el nodo sólo acepta
+/// `TLS_AES_128_GCM_SHA256` (0x1301) y `TLS_CHACHA20_POLY1305_SHA256` (0x1303).
+/// `TLS_AES_256_GCM_SHA384` y `TLS_AES_128_CCM_SHA256` se reconocen como suites
+/// TLS 1.3 (viajan en el saludo) pero **no** se aceptan en una sesión: elegirlas
+/// devolvería claves de una longitud que este módulo no puede sellar.
+pub fn suite_key_length(cipher: u16) -> Option<usize> {
+    match cipher {
+        TLS_AES_128_GCM_SHA256 => Some(SUITE_AES128_KEY),
+        TLS_CHACHA20_POLY1305_SHA256 => Some(SUITE_CHACHA_KEY),
+        _ => None,
+    }
+}
+
+/// ¿Bara sabe sellar registros con esta suite?
+pub fn suite_is_supported(cipher: u16) -> bool {
+    suite_key_length(cipher).is_some()
+}
+
+/// Nombre con el que el estándar bautiza la suite (para informes).
+pub fn suite_name(cipher: u16) -> &'static str {
+    match cipher {
+        TLS_AES_128_GCM_SHA256 => "TLS_AES_128_GCM_SHA256",
+        TLS_AES_256_GCM_SHA384 => "TLS_AES_256_GCM_SHA384",
+        TLS_CHACHA20_POLY1305_SHA256 => "TLS_CHACHA20_POLY1305_SHA256",
+        TLS_AES_128_CCM_SHA256 => "TLS_AES_128_CCM_SHA256",
+        _ => "suite desconocida",
+    }
+}
 
 /// Grupo nombrado `x25519`.
 pub const GROUP_X25519: u16 = 0x001d;
@@ -1111,23 +1160,55 @@ pub fn application_secrets(
     )
 }
 
-/// Claves de tráfico de una dirección: clave y vector de inicialización.
+/// Claves de tráfico de una dirección: suite, clave y vector de inicialización.
+///
+/// `key` mide siempre 32 bytes porque es el tamaño del secreto expandido; la
+/// **suite** decide cuántos de esos bytes son clave (16 en
+/// `TLS_AES_128_GCM_SHA256`, 32 en `TLS_CHACHA20_POLY1305_SHA256`). Así la
+/// derivación es una sola y el sellado elige el AEAD correcto sin ambigüedad.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrafficKeys {
-    /// Clave `AEAD` (32 bytes para ChaCha20-Poly1305).
+    /// Clave `AEAD`; los bytes útiles son [`TrafficKeys::key_length`].
     pub key: [u8; 32],
     /// Vector de inicialización (12 bytes).
     pub iv: [u8; 12],
+    /// Conjunto de cifrado con el que se sella (0x1301 o 0x1303).
+    pub suite: u16,
 }
 
 impl TrafficKeys {
-    /// Deriva `key` e `iv` de un secreto de tráfico.
+    /// Deriva `key` e `iv` para `ChaCha20-Poly1305` (la suite histórica).
     pub fn from_secret(secret: &[u8; 32]) -> Self {
+        TrafficKeys::derive(secret, TLS_CHACHA20_POLY1305_SHA256, SUITE_CHACHA_KEY)
+    }
+
+    /// Deriva `key` e `iv` para la suite indicada, si Bara la implementa.
+    pub fn from_secret_with(secret: &[u8; 32], suite: u16) -> Option<Self> {
+        Some(TrafficKeys::derive(secret, suite, suite_key_length(suite)?))
+    }
+
+    /// `HKDF-Expand-Label(secreto, "key" ‖ "iv")` con la longitud de la suite.
+    fn derive(secret: &[u8; 32], suite: u16, length: usize) -> Self {
+        let material = hkdf_expand_label(secret, "key", &[], length);
         let mut key = [0_u8; 32];
-        overlay(&mut key, &hkdf_expand_label(secret, "key", &[], 32));
-        let mut iv = [0_u8; 12];
-        overlay(&mut iv, &hkdf_expand_label(secret, "iv", &[], 12));
-        TrafficKeys { key, iv }
+        overlay(&mut key, &material);
+        let mut iv = [0_u8; SUITE_IV];
+        overlay(&mut iv, &hkdf_expand_label(secret, "iv", &[], SUITE_IV));
+        TrafficKeys { key, iv, suite }
+    }
+
+    /// Cuántos bytes de [`TrafficKeys::key`] son clave para esta suite.
+    pub fn key_length(&self) -> usize {
+        if self.suite == TLS_AES_128_GCM_SHA256 {
+            SUITE_AES128_KEY
+        } else {
+            SUITE_CHACHA_KEY
+        }
+    }
+
+    /// Material de clave efectivo: el prefijo que consume el AEAD de la suite.
+    pub fn key_material(&self) -> &[u8] {
+        self.key.get(..self.key_length()).unwrap_or(&self.key)
     }
 
     /// Nonce del registro `n`: `iv ⊕ seq` (los ocho bytes finales, RFC 8446 §5.3).
@@ -1151,7 +1232,45 @@ impl TrafficKeys {
 // Protección de registros (RFC 8446 §5.3)
 // ─────────────────────────────────────────────────────────────────────────
 
-/// Sella un registro de aplicación con `ChaCha20-Poly1305`.
+/// Bytes que añade el sello de un registro: 16 en las dos suites (el mismo
+/// tamaño de etiqueta de `Poly1305` y de `GCM`).
+pub fn record_overhead() -> usize {
+    AEAD_TAG
+}
+
+/// Sella la carga interior con el AEAD que manda la suite de las claves.
+///
+/// `TLS_AES_128_GCM_SHA256` usa el GCM nativo de [`crate::crypto_native`] y
+/// `TLS_CHACHA20_POLY1305_SHA256` el AEAD histórico del núcleo. Como el tamaño
+/// de etiqueta coincide, la longitud de un registro no delata la suite.
+fn seal_aead(
+    keys: &TrafficKeys,
+    nonce: &[u8; SUITE_IV],
+    header: &[u8],
+    inner: &[u8],
+) -> Option<Vec<u8>> {
+    if keys.suite == TLS_AES_128_GCM_SHA256 {
+        aes128_gcm_seal(keys.key_material(), nonce, header, inner)
+    } else {
+        Some(aead_seal(&keys.key, nonce, header, inner))
+    }
+}
+
+/// Abre la carga interior con el AEAD que manda la suite de las claves.
+fn open_aead(
+    keys: &TrafficKeys,
+    nonce: &[u8; SUITE_IV],
+    header: &[u8],
+    sealed: &[u8],
+) -> Option<Vec<u8>> {
+    if keys.suite == TLS_AES_128_GCM_SHA256 {
+        aes128_gcm_open(keys.key_material(), nonce, header, sealed)
+    } else {
+        aead_open(&keys.key, nonce, header, sealed)
+    }
+}
+
+/// Sella un registro de aplicación con el AEAD de su suite.
 ///
 /// * **Carga interior**: `texto ‖ tipo_de_contenido` (el relleno interior es
 ///   opcional y aquí no se añade).
@@ -1181,7 +1300,7 @@ pub fn seal_record(
     put_u16(&mut header, LEGACY_VERSION);
     put_u16(&mut header, length as u16);
 
-    let sealed = aead_seal(&keys.key, &keys.nonce(sequence), &header, &inner);
+    let sealed = seal_aead(keys, &keys.nonce(sequence), &header, &inner)?;
     let mut out = header;
     out.extend_from_slice(&sealed);
     Some(out)
@@ -1203,7 +1322,7 @@ pub fn open_record(keys: &TrafficKeys, sequence: u64, message: &[u8]) -> Option<
     let rest = reader.remaining();
     let sealed = reader.bytes(rest)?;
 
-    let inner = aead_open(&keys.key, &keys.nonce(sequence), header, sealed)?;
+    let inner = open_aead(keys, &keys.nonce(sequence), header, sealed)?;
     let mut end = inner.len();
     while end > 0 && inner[end - 1] == 0 {
         end -= 1;
@@ -1212,6 +1331,590 @@ pub fn open_record(keys: &TrafficKeys, sequence: u64, message: &[u8]) -> Option<
         return None;
     }
     Some((inner[end - 1], inner[..end - 1].to_vec()))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// `Finished`: `finished_key`, `verify_data` y extensiones
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Cuerpo de un mensaje de apretón de manos (`tipo ‖ longitud24 ‖ cuerpo`).
+///
+/// El mensaje llega **sin** cabecera de registro. Devuelve `None` si el tipo no
+/// coincide o si la longitud declarada no agota el mensaje: un `Finished`
+/// truncado o con relleno oculto no se acepta nunca.
+fn handshake_body(message: &[u8], kind: u8) -> Option<&[u8]> {
+    let mut reader = Reader::new(message);
+    if reader.u8()? != kind {
+        return None;
+    }
+    let length = usize::try_from(reader.u24()?).ok()?;
+    let body = reader.bytes(length)?;
+    if reader.remaining() != 0 {
+        return None;
+    }
+    Some(body)
+}
+
+/// Cuerpo de un mensaje de apretón que llega en un registro **en claro**.
+fn clear_handshake_payload(record: &[u8], kind: u8) -> Option<&[u8]> {
+    let mut reader = Reader::new(record);
+    if reader.u8()? != CT_HANDSHAKE {
+        return None;
+    }
+    if reader.u16()? != LEGACY_VERSION {
+        return None;
+    }
+    let declared = usize::from(reader.u16()?);
+    if declared != record.len().checked_sub(5)? {
+        return None;
+    }
+    let rest = reader.remaining();
+    handshake_body(reader.bytes(rest)?, kind)
+}
+
+/// Lee la lista de tipos de extensión de un cuerpo de `EncryptedExtensions`.
+fn extension_types(body: &[u8]) -> Option<Vec<u16>> {
+    let mut outer = Reader::new(body);
+    let inner_bytes = outer.vec16()?;
+    if outer.remaining() != 0 {
+        return None;
+    }
+    let mut inner = Reader::new(inner_bytes);
+    let mut kinds = Vec::new();
+    while inner.remaining() > 0 {
+        kinds.push(inner.u16()?);
+        let _body = inner.vec16()?;
+    }
+    if inner.remaining() != 0 {
+        return None;
+    }
+    Some(kinds)
+}
+
+/// `verify_data` de un `Finished` en claro (registro `Handshake` sin cifrar).
+pub fn parse_finished(record: &[u8]) -> Option<[u8; FINISHED_LEN]> {
+    let body = clear_handshake_payload(record, HS_FINISHED)?;
+    if body.len() != FINISHED_LEN {
+        return None;
+    }
+    let mut verify_data = [0_u8; FINISHED_LEN];
+    overlay(&mut verify_data, body);
+    Some(verify_data)
+}
+
+/// Tipos de extensión de un `EncryptedExtensions` en claro.
+pub fn parse_encrypted_extensions(record: &[u8]) -> Option<Vec<u16>> {
+    extension_types(clear_handshake_payload(record, HS_ENCRYPTED_EXTENSIONS)?)
+}
+
+/// `finished_key = HKDF-Expand-Label(secreto, "finished", "", 32)` (RFC 8446 §4.4.4).
+pub fn finished_key(traffic_secret: &[u8; 32]) -> [u8; FINISHED_LEN] {
+    let mut key = [0_u8; FINISHED_LEN];
+    overlay(
+        &mut key,
+        &hkdf_expand_label(traffic_secret, "finished", &[], FINISHED_LEN),
+    );
+    key
+}
+
+/// `verify_data = HMAC(finished_key, Transcript-Hash(mensajes vistos))`.
+pub fn finished_verify_data(finished_key: &[u8; 32], transcript: &[u8; 32]) -> [u8; FINISHED_LEN] {
+    hmac_sha256(finished_key, transcript)
+}
+
+/// Comprueba un `verify_data` contra el transcript con la clave del `Finished`.
+///
+/// La comparación es de tiempo constante ([`digest_eq`]): no filtra por dónde
+/// difiere una falsificación.
+pub fn verify_finished(
+    traffic_secret: &[u8; 32],
+    transcript: &[u8; 32],
+    received: &[u8; FINISHED_LEN],
+) -> bool {
+    let expected = finished_verify_data(&finished_key(traffic_secret), transcript);
+    digest_eq(&expected, received)
+}
+
+/// Mensaje `Finished` completo (`tipo ‖ longitud24 ‖ verify_data`).
+pub fn finished_message(verify_data: &[u8; FINISHED_LEN]) -> Vec<u8> {
+    handshake(HS_FINISHED, verify_data)
+}
+
+/// Sella un `Finished` con claves de apretón de manos ya derivadas.
+pub fn seal_finished(
+    keys: &TrafficKeys,
+    sequence: u64,
+    verify_data: &[u8; FINISHED_LEN],
+) -> Option<Vec<u8>> {
+    seal_record(keys, sequence, CT_HANDSHAKE, &finished_message(verify_data))
+}
+
+/// Tramo del apretón de manos en el que se encuentra una sesión Bara.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HandshakeState {
+    /// Aún no se ha emitido el `ClientHello`.
+    Idle,
+    /// `ClientHello` emitido; se espera el `ServerHello`.
+    ClientHelloSent,
+    /// `ServerHello` aceptado y secretos de apretón derivados.
+    ServerHelloReceived,
+    /// `EncryptedExtensions` descifradas y unidas al transcript.
+    EncryptedExtensionsReceived,
+    /// `Finished` del servidor descifrado **y** verificado.
+    ServerFinished,
+    /// Claves de aplicación derivadas: la sesión admite datos.
+    Established,
+    /// El apretón de manos se rompió: no se reanuda jamás.
+    Failed,
+}
+
+impl HandshakeState {
+    /// Posición en el orden del apretón (para exigir pasos sin saltos).
+    pub fn step(&self) -> u8 {
+        match self {
+            HandshakeState::Idle => 0,
+            HandshakeState::ClientHelloSent => 1,
+            HandshakeState::ServerHelloReceived => 2,
+            HandshakeState::EncryptedExtensionsReceived => 3,
+            HandshakeState::ServerFinished => 4,
+            HandshakeState::Established => 5,
+            HandshakeState::Failed => 6,
+        }
+    }
+
+    /// ¿La sesión completó el apretón y tiene claves de aplicación?
+    pub fn is_established(&self) -> bool {
+        *self == HandshakeState::Established
+    }
+
+    /// Nombre legible del tramo.
+    pub fn label(&self) -> &'static str {
+        match self {
+            HandshakeState::Idle => "inactivo",
+            HandshakeState::ClientHelloSent => "clienthello enviado",
+            HandshakeState::ServerHelloReceived => "serverhello recibido",
+            HandshakeState::EncryptedExtensionsReceived => "extensiones cifradas",
+            HandshakeState::ServerFinished => "finished del servidor",
+            HandshakeState::Established => "establecido",
+            HandshakeState::Failed => "roto",
+        }
+    }
+}
+
+/// Informe de un `ServerHello` aceptado.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerHelloOutcome {
+    /// Suite elegida por el servidor.
+    pub suite: u16,
+    /// Nombre estándar de la suite.
+    pub name: &'static str,
+    /// Bytes de clave de la suite.
+    pub key_length: usize,
+    /// Digest del transcript `ClientHello ‖ ServerHello`.
+    pub transcript: [u8; 32],
+}
+
+/// Informe de un `Finished` del servidor aceptado y verificado.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FinishedOutcome {
+    /// Suite de la sesión.
+    pub suite: u16,
+    /// `verify_data` que acreditó el transcript.
+    pub verify_data: [u8; FINISHED_LEN],
+    /// Digest del transcript justo antes de este `Finished`.
+    pub transcript: [u8; 32],
+}
+
+/// Par de claves de aplicación de una dirección, con su transcript.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApplicationKeys {
+    /// Claves del cliente (`c ap traffic`).
+    pub client: TrafficKeys,
+    /// Claves del servidor (`s ap traffic`).
+    pub server: TrafficKeys,
+    /// Digest del transcript hasta el `Finished` del servidor (RFC 8446 §7.1).
+    pub transcript: [u8; 32],
+    /// Suite común de ambas direcciones.
+    pub suite: u16,
+}
+
+/// Máquina de estados del apretón de manos TLS 1.3 de Bara.
+///
+/// Recorre **todo** el apretón, no sólo el `ServerHello`: conserva el transcript
+/// real (cada mensaje entra en orden), descifra el vuelo del servidor con las
+/// claves de apretón de manos, **verifica** el `Finished` contra el transcript y
+/// sólo entonces deriva las claves de aplicación. Cualquier paso fuera de orden,
+/// cualquier longitud mentida o cualquier etiqueta que no cuadre devuelve `None`
+/// y deja el estado en [`HandshakeState::Failed`]: un apretón roto no se reanuda.
+#[derive(Debug, Clone)]
+pub struct HandshakeMachine {
+    client: CamouflagedClient,
+    state: HandshakeState,
+    transcript: Vec<Vec<u8>>,
+    secrets: Option<HandshakeSecrets>,
+    suite: u16,
+    inbound: u64,
+    outbound: u64,
+    inbound_app: u64,
+    outbound_app: u64,
+    client_verify_data: Option<[u8; FINISHED_LEN]>,
+    server_verify_data: Option<[u8; FINISHED_LEN]>,
+    server_transcript: Option<[u8; 32]>,
+    applications: Option<ApplicationKeys>,
+}
+
+impl HandshakeMachine {
+    /// Máquina lista para arrancar desde una semilla.
+    pub fn new(profile: CamouflageProfile, seed: &[u8]) -> Self {
+        HandshakeMachine::from_client(CamouflagedClient::from_seed(profile, seed))
+    }
+
+    /// Máquina lista para arrancar desde un ADN de enjambre.
+    pub fn from_adn(profile: CamouflageProfile, adn: &[u8; 32]) -> Self {
+        HandshakeMachine::from_client(CamouflagedClient::from_adn(profile, adn))
+    }
+
+    /// Máquina sobre un cliente camuflado ya construido.
+    pub fn from_client(client: CamouflagedClient) -> Self {
+        HandshakeMachine {
+            client,
+            state: HandshakeState::Idle,
+            transcript: Vec::new(),
+            secrets: None,
+            suite: TLS_CHACHA20_POLY1305_SHA256,
+            inbound: 0,
+            outbound: 0,
+            inbound_app: 0,
+            outbound_app: 0,
+            client_verify_data: None,
+            server_verify_data: None,
+            server_transcript: None,
+            applications: None,
+        }
+    }
+
+    /// Cliente camuflado que firma el saludo.
+    pub fn client(&self) -> &CamouflagedClient {
+        &self.client
+    }
+
+    /// Tramo actual del apretón.
+    pub fn state(&self) -> HandshakeState {
+        self.state
+    }
+
+    /// ¿Terminó el apretón con claves de aplicación listas?
+    pub fn is_established(&self) -> bool {
+        self.state.is_established()
+    }
+
+    /// Suite negociada (antes del `ServerHello` es la ofrecida por defecto).
+    pub fn suite(&self) -> u16 {
+        self.suite
+    }
+
+    /// Nombre estándar de la suite negociada.
+    pub fn suite_name(&self) -> &'static str {
+        suite_name(self.suite)
+    }
+
+    /// Digest del transcript con todo lo visto hasta ahora.
+    pub fn transcript_hash(&self) -> [u8; 32] {
+        let messages: Vec<&[u8]> = self.transcript.iter().map(|item| item.as_slice()).collect();
+        transcript_hash(&messages)
+    }
+
+    /// Digest del transcript congelado al verificar el `Finished` del servidor.
+    ///
+    /// Es el que fija las claves de aplicación; queda disponible aunque después
+    /// entre el `Finished` del cliente en el transcript vivo.
+    pub fn server_transcript_hash(&self) -> Option<[u8; 32]> {
+        self.server_transcript
+    }
+
+    /// Secretos de apretón de manos, si el `ServerHello` ya se aceptó.
+    pub fn secrets(&self) -> Option<&HandshakeSecrets> {
+        self.secrets.as_ref()
+    }
+
+    /// Claves de apretón de manos de la dirección cliente.
+    pub fn client_handshake_keys(&self) -> Option<TrafficKeys> {
+        let secret = self.secrets.as_ref()?.client;
+        TrafficKeys::from_secret_with(&secret, self.suite)
+    }
+
+    /// Claves de apretón de manos de la dirección servidor.
+    pub fn server_handshake_keys(&self) -> Option<TrafficKeys> {
+        let secret = self.secrets.as_ref()?.server;
+        TrafficKeys::from_secret_with(&secret, self.suite)
+    }
+
+    /// `verify_data` que el cliente acreditó (si ya emitió su `Finished`).
+    pub fn client_verify_data(&self) -> Option<[u8; FINISHED_LEN]> {
+        self.client_verify_data
+    }
+
+    /// `verify_data` del servidor que quedó verificado.
+    pub fn server_verify_data(&self) -> Option<[u8; FINISHED_LEN]> {
+        self.server_verify_data
+    }
+}
+
+impl HandshakeMachine {
+    /// Emite el `ClientHello` y lo une al transcript.
+    ///
+    /// `Some(saludo)` mientras el apretón siga vivo; `None` si ya se rompió o ya
+    /// se estableció (un apretón cerrado no se reinicia por accidente).
+    pub fn start(&mut self) -> Option<Vec<u8>> {
+        if matches!(
+            self.state,
+            HandshakeState::Failed | HandshakeState::Established
+        ) {
+            return None;
+        }
+        let hello = self.client.hello();
+        if self.transcript.is_empty() {
+            self.transcript.push(hello.get(5..)?.to_vec());
+            self.state = HandshakeState::ClientHelloSent;
+        }
+        Some(hello)
+    }
+
+    /// Acepta el `ServerHello` y deriva los secretos de apretón de manos.
+    ///
+    /// Exige que el `ClientHello` ya esté en el transcript (orden estricto) y
+    /// que la suite elegida sea una que Bara sepa sellar.
+    pub fn accept_server_hello(&mut self, record: &[u8]) -> Option<ServerHelloOutcome> {
+        if self.state != HandshakeState::ClientHelloSent {
+            return None;
+        }
+        let parsed = parse_server_hello(record)?;
+        let key_length = suite_key_length(parsed.cipher)?;
+        if !self.client.accepts(parsed.cipher)
+            || parsed.session_id != self.client.session_id
+            || parsed.supported_version != Some(TLS13_VERSION)
+        {
+            return self.fail();
+        }
+        let mut share = [0_u8; 32];
+        overlay(&mut share, parsed.share_for(GROUP_X25519)?);
+        let shared = x25519(&self.client.secret, &share);
+        let hello = self.transcript.first()?.clone();
+        let transcript = transcript_hash(&[hello.as_slice(), record.get(5..)?]);
+        let secrets = handshake_secrets(&shared, &transcript);
+
+        self.transcript.push(record.get(5..)?.to_vec());
+        self.secrets = Some(secrets);
+        self.suite = parsed.cipher;
+        self.state = HandshakeState::ServerHelloReceived;
+        Some(ServerHelloOutcome {
+            suite: parsed.cipher,
+            name: suite_name(parsed.cipher),
+            key_length,
+            transcript,
+        })
+    }
+
+    /// Acepta las `EncryptedExtensions`, cifradas con las claves del servidor.
+    pub fn accept_encrypted_extensions(&mut self, record: &[u8]) -> Option<Vec<u16>> {
+        if self.state != HandshakeState::ServerHelloReceived {
+            return None;
+        }
+        let plaintext = self.open_server_record(record)?;
+        let body = handshake_body(&plaintext, HS_ENCRYPTED_EXTENSIONS)?;
+        let kinds = extension_types(body)?;
+        self.transcript.push(plaintext);
+        self.state = HandshakeState::EncryptedExtensionsReceived;
+        Some(kinds)
+    }
+
+    /// Acepta un mensaje cifrado intermedio del vuelo del servidor
+    /// (`Certificate`, `CertificateVerify`…) y devuelve su tipo.
+    ///
+    /// El `Finished` **no** entra por aquí: tiene su propio paso con verificación.
+    /// La cadena de certificados no se inspecciona a propósito: Bara no delega su
+    /// identidad en una autoridad ajena.
+    pub fn accept_server_message(&mut self, record: &[u8]) -> Option<u8> {
+        if self.state != HandshakeState::EncryptedExtensionsReceived {
+            return None;
+        }
+        let plaintext = self.open_server_record(record)?;
+        let kind = *plaintext.first()?;
+        if kind == HS_FINISHED {
+            return None;
+        }
+        handshake_body(&plaintext, kind)?;
+        self.transcript.push(plaintext);
+        Some(kind)
+    }
+
+    /// Marca el apretón como roto: no se reanuda jamás.
+    fn fail<T>(&mut self) -> Option<T> {
+        self.state = HandshakeState::Failed;
+        None
+    }
+
+    /// Descifra el siguiente registro del servidor con sus claves de apretón.
+    fn open_server_record(&mut self, record: &[u8]) -> Option<Vec<u8>> {
+        let keys = self.server_handshake_keys()?;
+        let (kind, plaintext) = open_record(&keys, self.inbound, record)?;
+        if kind != CT_HANDSHAKE {
+            return None;
+        }
+        self.inbound = self.inbound.wrapping_add(1);
+        Some(plaintext)
+    }
+}
+
+impl HandshakeMachine {
+    /// Acepta y **verifica** el `Finished` del servidor.
+    ///
+    /// El `verify_data` se calcula sobre el transcript **sin** este `Finished`
+    /// (RFC 8446 §4.4.4) y se compara en tiempo constante. Si no cuadra, el
+    /// apretón queda roto: no hay `Established` sin prueba.
+    pub fn accept_server_finished(&mut self, record: &[u8]) -> Option<FinishedOutcome> {
+        if self.state != HandshakeState::EncryptedExtensionsReceived {
+            return None;
+        }
+        let plaintext = self.open_server_record(record)?;
+        let body = handshake_body(&plaintext, HS_FINISHED)?;
+        if body.len() != FINISHED_LEN {
+            return self.fail();
+        }
+        let mut verify_data = [0_u8; FINISHED_LEN];
+        overlay(&mut verify_data, body);
+        let server_secret = self.secrets.as_ref()?.server;
+        let transcript = self.transcript_hash();
+        if !verify_finished(&server_secret, &transcript, &verify_data) {
+            return self.fail();
+        }
+        self.transcript.push(plaintext);
+        self.server_verify_data = Some(verify_data);
+        // El transcript hasta el `Finished` del servidor es el que fija las
+        // claves de aplicación (RFC 8446 §4.4.4): se guarda ya, no más tarde.
+        self.server_transcript = Some(self.transcript_hash());
+        self.state = HandshakeState::ServerFinished;
+        Some(FinishedOutcome {
+            suite: self.suite,
+            verify_data,
+            transcript,
+        })
+    }
+
+    /// Emite el `Finished` del cliente sobre el transcript ya verificado.
+    ///
+    /// Sella el mensaje con las claves de apretón del cliente (secuencia 0 de esa
+    /// época) y lo une al transcript, como exige el orden del protocolo.
+    pub fn client_finished(&mut self) -> Option<Vec<u8>> {
+        if self.state != HandshakeState::ServerFinished {
+            return None;
+        }
+        let client_secret = self.secrets.as_ref()?.client;
+        let keys = TrafficKeys::from_secret_with(&client_secret, self.suite)?;
+        let transcript = self.transcript_hash();
+        let verify_data = finished_verify_data(&finished_key(&client_secret), &transcript);
+        let message = finished_message(&verify_data);
+        let record = seal_record(&keys, self.outbound, CT_HANDSHAKE, &message)?;
+        self.outbound = self.outbound.wrapping_add(1);
+        self.transcript.push(message);
+        self.client_verify_data = Some(verify_data);
+        Some(record)
+    }
+
+    /// Deriva (una sola vez) las claves de aplicación y cierra el apretón.
+    ///
+    /// El transcript es el que llega **hasta el `Finished` del servidor**
+    /// (RFC 8446 §7.1); por eso este paso es posterior a su verificación.
+    pub fn application_keys(&mut self) -> Option<&ApplicationKeys> {
+        if self.applications.is_none() {
+            if self.state != HandshakeState::ServerFinished {
+                return None;
+            }
+            let handshake_secret = self.secrets.as_ref()?.handshake_secret;
+            let transcript = self.server_transcript?;
+            let (client, server) = application_secrets(&handshake_secret, &transcript);
+            let keys = ApplicationKeys {
+                client: TrafficKeys::from_secret_with(&client, self.suite)?,
+                server: TrafficKeys::from_secret_with(&server, self.suite)?,
+                transcript,
+                suite: self.suite,
+            };
+            self.applications = Some(keys);
+            self.state = HandshakeState::Established;
+        }
+        self.applications.as_ref()
+    }
+}
+
+/// Derivación formal de claves de aplicación, con transcript y suite explícitos.
+///
+/// Existe para cerrar el apretón cuando el transcript lo aporta el llamante (por
+/// ejemplo, al reanudar sobre un zócalo ya abierto). Nunca inventa una suite:
+/// si Bara no la implementa, devuelve `None`.
+impl HandshakeMachine {
+    /// `(cliente, servidor)` de aplicación para el transcript y la suite dados.
+    pub fn application_keys_with(
+        &self,
+        transcript: &[u8; 32],
+        suite: u16,
+    ) -> Option<(TrafficKeys, TrafficKeys)> {
+        let handshake_secret = self.secrets.as_ref()?.handshake_secret;
+        let (client, server) = application_secrets(&handshake_secret, transcript);
+        Some((
+            TrafficKeys::from_secret_with(&client, suite)?,
+            TrafficKeys::from_secret_with(&server, suite)?,
+        ))
+    }
+
+    /// Claves de aplicación ya derivadas, sin forzar el cierre del apretón.
+    pub fn application_keys_ref(&self) -> Option<&ApplicationKeys> {
+        self.applications.as_ref()
+    }
+
+    /// Sella un registro de datos con las claves de aplicación del cliente.
+    ///
+    /// Los datos de aplicación viven en su propia época: la secuencia empieza de
+    /// cero al terminar el apretón, como manda el protocolo.
+    pub fn seal_application_record(
+        &mut self,
+        content_type: u8,
+        plaintext: &[u8],
+    ) -> Option<Vec<u8>> {
+        let keys = self.applications.as_ref()?.client.clone();
+        let record = seal_record(&keys, self.outbound_app, content_type, plaintext)?;
+        self.outbound_app = self.outbound_app.wrapping_add(1);
+        Some(record)
+    }
+
+    /// Abre un registro de datos con las claves de aplicación del servidor.
+    pub fn open_application_record(&mut self, record: &[u8]) -> Option<(u8, Vec<u8>)> {
+        let keys = self.applications.as_ref()?.server.clone();
+        let opened = open_record(&keys, self.inbound_app, record)?;
+        self.inbound_app = self.inbound_app.wrapping_add(1);
+        Some(opened)
+    }
+
+    /// Descripción de una línea del apretón.
+    pub fn describe(&self) -> String {
+        let shared = match self.secrets.as_ref() {
+            Some(secrets) => short_hex(&secrets.shared[..8]),
+            None => "—".to_string(),
+        };
+        format!(
+            "apretón «{}» · {} · suite {} (0x{:04x}) · transcript {} · secreto {} · finished {}",
+            self.client.profile.name,
+            self.state.label(),
+            self.suite_name(),
+            self.suite,
+            short_hex(&self.transcript_hash()[..8]),
+            shared,
+            if self.server_verify_data.is_some() {
+                "verificado"
+            } else {
+                "pendiente"
+            }
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1226,9 +1929,14 @@ pub const READ_TIMEOUT_MS: u64 = 2_000;
 /// El apretón de manos llega hasta el `ServerHello`: se envía el saludo, se
 /// verifica el eco del servidor (identificador de sesión, conjunto de cifrado
 /// ofrecido, versión), se calcula el secreto X25519 y se derivan las claves.
+/// Sólo se aceptan suites que Bara sepa sellar
+/// ([`suite_is_supported`]): `0x1301` y `0x1303`.
+///
 /// Las claves de **aplicación** exigen el transcript completo (`Finished`
-/// incluido), así que se entregan como parámetro
-/// ([`HttpsSession::application_keys_with`]) en lugar de fingirlas.
+/// incluido) y la suite de la dirección, así que se entregan como parámetro
+/// ([`HttpsSession::application_keys_with`]) en lugar de fingirlas; para recorrer
+/// el apretón entero con verificación del `Finished`, [`HttpsSession::machine`]
+/// reconstruye la [`HandshakeMachine`] equivalente sobre esta sesión.
 pub struct HttpsSession {
     /// Dirección del par.
     pub address: String,
@@ -1272,6 +1980,7 @@ impl HttpsSession {
 
         let message = read_record(&mut stream)?;
         let parsed = parse_server_hello(&message)?;
+        suite_key_length(parsed.cipher)?;
         if !client.accepts(parsed.cipher) {
             return None;
         }
@@ -1301,23 +2010,68 @@ impl HttpsSession {
         })
     }
 
+    /// Suite elegida por el servidor (validada al conectar).
+    pub fn suite(&self) -> u16 {
+        self.server_hello.cipher
+    }
+
+    /// Nombre estándar de la suite negociada.
+    pub fn suite_name(&self) -> &'static str {
+        suite_name(self.server_hello.cipher)
+    }
+
+    /// Tramo del apretón alcanzado por la sesión de zócalo.
+    pub fn handshake_state(&self) -> HandshakeState {
+        HandshakeState::ServerHelloReceived
+    }
+
+    /// Máquina de apretón equivalente a esta sesión.
+    ///
+    /// Reproduce el mismo `ClientHello` (el cliente es determinista para su ADN)
+    /// y el mismo `ServerHello`, de modo que el transcript coincide y se puede
+    /// continuar el apretón cifrado, verificar el `Finished` y derivar las claves
+    /// de aplicación sin abrir un segundo zócalo.
+    pub fn machine(&self) -> Option<HandshakeMachine> {
+        let mut machine = HandshakeMachine::from_adn(self.client.profile.clone(), &self.adn);
+        machine.start()?;
+        let (group, share) = self.server_hello.key_share.clone()?;
+        let mut publico = [0_u8; 32];
+        overlay(&mut publico, &share);
+        let record = server_hello(
+            self.server_hello.cipher,
+            &self.server_hello.session_id,
+            &self.server_hello.random,
+            group,
+            &publico,
+        );
+        machine.accept_server_hello(&record)?;
+        Some(machine)
+    }
+
     /// Claves de aplicación `(cliente, servidor)` para un transcript dado.
-    pub fn application_keys_with(&self, transcript: &[u8; 32]) -> (TrafficKeys, TrafficKeys) {
+    ///
+    /// Usa la suite negociada; devuelve `None` si no hay transcript válido para
+    /// la suite (nunca entrega claves de una longitud distinta a la acordada).
+    pub fn application_keys_with(
+        &self,
+        transcript: &[u8; 32],
+    ) -> Option<(TrafficKeys, TrafficKeys)> {
+        let suite = self.server_hello.cipher;
         let (client, server) = application_secrets(&self.secrets.handshake_secret, transcript);
-        (
-            TrafficKeys::from_secret(&client),
-            TrafficKeys::from_secret(&server),
-        )
+        Some((
+            TrafficKeys::from_secret_with(&client, suite)?,
+            TrafficKeys::from_secret_with(&server, suite)?,
+        ))
     }
 
     /// Claves de apretón de manos de la dirección cliente.
-    pub fn client_handshake_keys(&self) -> TrafficKeys {
-        TrafficKeys::from_secret(&self.secrets.client)
+    pub fn client_handshake_keys(&self) -> Option<TrafficKeys> {
+        TrafficKeys::from_secret_with(&self.secrets.client, self.server_hello.cipher)
     }
 
     /// Claves de apretón de manos de la dirección servidor.
-    pub fn server_handshake_keys(&self) -> TrafficKeys {
-        TrafficKeys::from_secret(&self.secrets.server)
+    pub fn server_handshake_keys(&self) -> Option<TrafficKeys> {
+        TrafficKeys::from_secret_with(&self.secrets.server, self.server_hello.cipher)
     }
 
     /// ¿El saludo que enviamos lleva una marca de enjambre válida?
@@ -1327,7 +2081,7 @@ impl HttpsSession {
 
     /// Envía un registro de aplicación sellado. Devuelve su tamaño en el cable.
     pub fn send_record(&mut self, content_type: u8, plaintext: &[u8]) -> Option<usize> {
-        let (client, _server) = self.application_keys_with(&self.transcript);
+        let (client, _server) = self.application_keys_with(&self.transcript)?;
         let message = seal_record(&client, self.sent, content_type, plaintext)?;
         self.stream.write_all(&message).ok()?;
         self.stream.flush().ok()?;
@@ -1337,7 +2091,7 @@ impl HttpsSession {
 
     /// Recibe y abre un registro de aplicación.
     pub fn recv_record(&mut self) -> Option<(u8, Vec<u8>)> {
-        let (_client, server) = self.application_keys_with(&self.transcript);
+        let (_client, server) = self.application_keys_with(&self.transcript)?;
         let message = read_record(&mut self.stream)?;
         let opened = open_record(&server, self.received, &message)?;
         self.received = self.received.wrapping_add(1);
@@ -1352,9 +2106,10 @@ impl HttpsSession {
     /// Descripción de una línea.
     pub fn describe(&self) -> String {
         format!(
-            "sesión «{}» con {} · cifrado 0x{:04x} · secreto {} · transcript {} · marca {}",
+            "sesión «{}» con {} · cifrado {} (0x{:04x}) · secreto {} · transcript {} · marca {}",
             self.client.profile.name,
             self.address,
+            self.suite_name(),
             self.server_hello.cipher,
             self.shared_hex(),
             short_hex(&self.transcript[..8]),
@@ -1813,5 +2568,352 @@ mod tests {
             b"semilla-de-red"
         )
         .is_none());
+    }
+
+    /// Servidor de apretón de prueba: deriva sus claves y sella el vuelo cifrado.
+    ///
+    /// No abre zócalos: recibe el saludo en memoria y devuelve los registros ya
+    /// construidos, de modo que la prueba recorre el apretón entero byte a byte.
+    struct ServidorDePrueba {
+        secretos: HandshakeSecrets,
+        suite: u16,
+        transcript: Vec<Vec<u8>>,
+        seq: u64,
+    }
+
+    impl ServidorDePrueba {
+        /// Responde al saludo del cliente con su `ServerHello` de la suite dada.
+        fn nuevo(saludo: &[u8], suite: u16) -> Option<(ServidorDePrueba, Vec<u8>)> {
+            let parsed = parse_client_hello(saludo)?;
+            let mut flujo = DnaStream::from_dna(&swarm_adn(b"anfitrion-de-prueba"));
+            let secreto = flujo.x25519_secret();
+            let publico = x25519_base(&secreto);
+            let mut azar = [0_u8; 32];
+            overlay(&mut azar, &flujo.bytes(32));
+            let respuesta = server_hello(suite, &parsed.session_id, &azar, GROUP_X25519, &publico);
+            let mut compartido = [0_u8; 32];
+            overlay(&mut compartido, parsed.share_for(GROUP_X25519)?);
+            let compartido = x25519(&secreto, &compartido);
+            let transcript = transcript_hash(&[saludo.get(5..)?, respuesta.get(5..)?]);
+            let secretos = handshake_secrets(&compartido, &transcript);
+            let servidor = ServidorDePrueba {
+                secretos,
+                suite,
+                transcript: vec![saludo.get(5..)?.to_vec(), respuesta.get(5..)?.to_vec()],
+                seq: 0,
+            };
+            Some((servidor, respuesta))
+        }
+
+        /// Claves de apretón de manos propias.
+        fn claves(&self) -> Option<TrafficKeys> {
+            TrafficKeys::from_secret_with(&self.secretos.server, self.suite)
+        }
+
+        /// Claves de aplicación propias para el transcript actual.
+        fn claves_de_aplicacion(&self) -> Option<(TrafficKeys, TrafficKeys)> {
+            let transcript = self.transcript_hash();
+            let (cliente, servidor) =
+                application_secrets(&self.secretos.handshake_secret, &transcript);
+            Some((
+                TrafficKeys::from_secret_with(&cliente, self.suite)?,
+                TrafficKeys::from_secret_with(&servidor, self.suite)?,
+            ))
+        }
+
+        /// Digest del transcript tal como lo ve el servidor.
+        fn transcript_hash(&self) -> [u8; 32] {
+            let mensajes: Vec<&[u8]> = self.transcript.iter().map(|m| m.as_slice()).collect();
+            transcript_hash(&mensajes)
+        }
+
+        /// Sella un mensaje de apretón y lo une a su transcript.
+        fn sello(&mut self, mensaje: &[u8]) -> Option<Vec<u8>> {
+            let claves = self.claves()?;
+            let registro = seal_record(&claves, self.seq, CT_HANDSHAKE, mensaje)?;
+            self.seq = self.seq.wrapping_add(1);
+            self.transcript.push(mensaje.to_vec());
+            Some(registro)
+        }
+
+        /// `verify_data` que el servidor debe acreditar con el transcript actual.
+        fn verify_data(&self) -> [u8; FINISHED_LEN] {
+            finished_verify_data(
+                &finished_key(&self.secretos.server),
+                &self.transcript_hash(),
+            )
+        }
+    }
+
+    /// Lista de extensiones vacía, como cuerpo de un `EncryptedExtensions`.
+    fn extensiones_vacias() -> Vec<u8> {
+        let mut cuerpo = Vec::new();
+        put_u16(&mut cuerpo, 0);
+        cuerpo
+    }
+
+    #[test]
+    fn las_suites_declaran_la_longitud_de_clave_que_realmente_usan() {
+        assert_eq!(suite_key_length(TLS_AES_128_GCM_SHA256), Some(16));
+        assert_eq!(suite_key_length(TLS_CHACHA20_POLY1305_SHA256), Some(32));
+        assert!(suite_is_supported(TLS_AES_128_GCM_SHA256));
+        assert!(suite_is_supported(TLS_CHACHA20_POLY1305_SHA256));
+        // Suites TLS 1.3 que viajan en el saludo pero Bara no sella.
+        assert_eq!(suite_key_length(TLS_AES_256_GCM_SHA384), None);
+        assert_eq!(suite_key_length(TLS_AES_128_CCM_SHA256), None);
+        assert!(!suite_is_supported(TLS_AES_256_GCM_SHA384));
+        assert_eq!(suite_name(TLS_AES_128_GCM_SHA256), "TLS_AES_128_GCM_SHA256");
+        assert_eq!(suite_name(0x9999), "suite desconocida");
+
+        let secreto = sha256(b"secreto de trafico");
+        let aes = TrafficKeys::from_secret_with(&secreto, TLS_AES_128_GCM_SHA256);
+        let chacha = TrafficKeys::from_secret_with(&secreto, TLS_CHACHA20_POLY1305_SHA256);
+        assert!(aes.is_some() && chacha.is_some());
+        let Some(aes) = aes else { return };
+        let Some(chacha) = chacha else { return };
+        assert_eq!(aes.key_length(), 16);
+        assert_eq!(chacha.key_length(), 32);
+        assert_eq!(aes.key_material().len(), 16);
+        assert_eq!(chacha.key_material().len(), 32);
+        // La `iv` mide lo mismo en las dos suites: el registro no delata cuál es.
+        assert_eq!(aes.iv, chacha.iv);
+        // El material no es el mismo: la etiqueta de longitud de HKDF cambia.
+        assert_ne!(aes.key_material(), &chacha.key_material()[..16]);
+        assert!(TrafficKeys::from_secret_with(&secreto, TLS_AES_256_GCM_SHA384).is_none());
+        assert!(TrafficKeys::from_secret_with(&secreto, 0x0000).is_none());
+
+        // Cada suite sella y abre lo suyo, y el tamaño del registro no cambia.
+        let registro = seal_record(&aes, 0, CT_APPLICATION_DATA, b"hola");
+        assert!(registro.is_some());
+        let Some(registro) = registro else { return };
+        assert_eq!(
+            open_record(&aes, 0, &registro),
+            Some((CT_APPLICATION_DATA, b"hola".to_vec()))
+        );
+        assert!(open_record(&chacha, 0, &registro).is_none());
+        assert_eq!(registro.len(), 5 + b"hola".len() + 1 + record_overhead());
+        assert_eq!(record_overhead(), AEAD_TAG);
+
+        // Y un registro de ChaCha no se abre como AES ni al revés.
+        let registro_chacha = seal_record(&chacha, 0, CT_APPLICATION_DATA, b"hola");
+        assert!(registro_chacha.is_some());
+        let Some(registro_chacha) = registro_chacha else {
+            return;
+        };
+        assert_eq!(registro_chacha.len(), registro.len());
+        assert!(open_record(&aes, 0, &registro_chacha).is_none());
+    }
+
+    #[test]
+    fn el_apreton_completo_verifica_el_finished_y_cierra_la_sesion() {
+        for suite in [TLS_CHACHA20_POLY1305_SHA256, TLS_AES_128_GCM_SHA256] {
+            let mut maquina =
+                HandshakeMachine::new(CamouflageProfile::browser("ejemplo.test"), b"apreton");
+            assert_eq!(maquina.state(), HandshakeState::Idle);
+
+            let saludo = maquina.start();
+            assert!(saludo.is_some());
+            let Some(saludo) = saludo else { return };
+            assert_eq!(maquina.state(), HandshakeState::ClientHelloSent);
+            // Arrancar dos veces no duplica el transcript.
+            assert_eq!(maquina.start(), Some(saludo.clone()));
+            assert_eq!(maquina.transcript_hash(), sha256(&saludo[5..]));
+
+            // El servidor responde y el cliente acepta la suite y sus claves.
+            let servidor = ServidorDePrueba::nuevo(&saludo, suite);
+            assert!(servidor.is_some());
+            let Some((mut servidor, respuesta)) = servidor else {
+                return;
+            };
+            let informe = maquina.accept_server_hello(&respuesta);
+            assert!(informe.is_some());
+            let Some(informe) = informe else { return };
+            assert_eq!(informe.suite, suite);
+            assert_eq!(Some(informe.key_length), suite_key_length(suite));
+            assert_eq!(informe.name, suite_name(suite));
+            assert_eq!(informe.transcript, servidor.transcript_hash());
+            assert_eq!(maquina.state(), HandshakeState::ServerHelloReceived);
+            assert_eq!(maquina.transcript_hash(), servidor.transcript_hash());
+            assert_eq!(
+                maquina.server_handshake_keys(),
+                TrafficKeys::from_secret_with(&servidor.secretos.server, suite)
+            );
+
+            // Vuelo cifrado: `EncryptedExtensions` y `Certificate`.
+            let ee = servidor.sello(&handshake(HS_ENCRYPTED_EXTENSIONS, &extensiones_vacias()));
+            assert!(ee.is_some());
+            let Some(ee) = ee else { return };
+            assert_eq!(maquina.accept_encrypted_extensions(&ee), Some(Vec::new()));
+            assert_eq!(maquina.state(), HandshakeState::EncryptedExtensionsReceived);
+            let certificado = servidor.sello(&handshake(HS_CERTIFICATE, b"cadena-de-prueba"));
+            assert!(certificado.is_some());
+            let Some(certificado) = certificado else {
+                return;
+            };
+            assert_eq!(
+                maquina.accept_server_message(&certificado),
+                Some(HS_CERTIFICATE)
+            );
+
+            // El `Finished` se calcula sobre el transcript **sin** él mismo.
+            let transcript_previo = servidor.transcript_hash();
+            let verificado = servidor.verify_data();
+            let finished = servidor.sello(&finished_message(&verificado));
+            assert!(finished.is_some());
+            let Some(finished) = finished else { return };
+            let cierre = maquina.accept_server_finished(&finished);
+            assert!(cierre.is_some());
+            let Some(cierre) = cierre else { return };
+            assert_eq!(cierre.verify_data, verificado);
+            assert_eq!(cierre.suite, suite);
+            assert_eq!(cierre.transcript, transcript_previo);
+            assert_eq!(maquina.server_verify_data(), Some(verificado));
+            assert_eq!(maquina.state(), HandshakeState::ServerFinished);
+
+            // El `Finished` del cliente lo abre el servidor y acredita el transcript.
+            let eco_cliente = maquina.client_finished();
+            assert!(eco_cliente.is_some());
+            let Some(eco_cliente) = eco_cliente else {
+                return;
+            };
+            let claves_apreton = TrafficKeys::from_secret_with(&servidor.secretos.client, suite);
+            assert!(claves_apreton.is_some());
+            let Some(claves_apreton) = claves_apreton else {
+                return;
+            };
+            let abierto = open_record(&claves_apreton, 0, &eco_cliente);
+            assert_eq!(abierto.as_ref().map(|(tipo, _)| *tipo), Some(CT_HANDSHAKE));
+            let cuerpo = abierto
+                .as_ref()
+                .and_then(|(_, texto)| handshake_body(texto, HS_FINISHED));
+            assert!(cuerpo.is_some());
+            let Some(cuerpo) = cuerpo else { return };
+            let esperado_cliente = finished_verify_data(
+                &finished_key(&servidor.secretos.client),
+                &servidor.transcript_hash(),
+            );
+            assert_eq!(cuerpo, esperado_cliente.as_slice());
+            assert_eq!(maquina.client_verify_data(), Some(esperado_cliente));
+
+            // Las claves de aplicación coinciden con las del servidor de prueba.
+            let claves = maquina.application_keys();
+            assert!(claves.is_some());
+            let Some(claves) = claves else { return };
+            assert_eq!(claves.suite, suite);
+            assert_eq!(claves.transcript, servidor.transcript_hash());
+            assert_eq!(claves.client.suite, suite);
+            assert_eq!(Some(claves.client.key_length()), suite_key_length(suite));
+            let propias = servidor.claves_de_aplicacion();
+            assert!(propias.is_some());
+            let Some((s_cliente, s_servidor)) = propias else {
+                return;
+            };
+            assert_eq!(claves.client, s_cliente);
+            assert_eq!(claves.server, s_servidor);
+            assert_ne!(s_cliente.key_material(), s_servidor.key_material());
+            assert_eq!(maquina.state(), HandshakeState::Established);
+            assert!(maquina.is_established());
+
+            // La sesión habla datos cifrados en su propia época (secuencia 0).
+            let dato = maquina.seal_application_record(CT_APPLICATION_DATA, b"orden soberana");
+            assert!(dato.is_some());
+            let Some(dato) = dato else { return };
+            assert_eq!(
+                open_record(&s_cliente, 0, &dato),
+                Some((CT_APPLICATION_DATA, b"orden soberana".to_vec()))
+            );
+            let acuse = seal_record(&s_servidor, 0, CT_APPLICATION_DATA, b"acuse");
+            assert!(acuse.is_some());
+            let Some(acuse) = acuse else { return };
+            assert_eq!(
+                maquina.open_application_record(&acuse),
+                Some((CT_APPLICATION_DATA, b"acuse".to_vec()))
+            );
+            // Repetir el número de secuencia no abre: el orden está atado.
+            assert!(maquina.open_application_record(&acuse).is_none());
+            assert!(maquina.describe().contains(suite_name(suite)));
+        }
+    }
+
+    #[test]
+    fn el_finished_mentido_o_fuera_de_orden_rompe_el_apreton() {
+        let suite = TLS_AES_128_GCM_SHA256;
+        let mut maquina = HandshakeMachine::new(
+            CamouflageProfile::browser("ejemplo.test"),
+            b"orden-estricto",
+        );
+        let Some(saludo) = maquina.start() else {
+            return;
+        };
+        let Some((mut servidor, respuesta)) = ServidorDePrueba::nuevo(&saludo, suite) else {
+            return;
+        };
+
+        // Sin `ServerHello` no se acepta nada del vuelo cifrado.
+        assert!(maquina.accept_server_finished(&respuesta).is_none());
+        assert!(maquina.accept_encrypted_extensions(&respuesta).is_none());
+        assert_eq!(maquina.state(), HandshakeState::ClientHelloSent);
+        assert!(maquina.application_keys().is_none());
+
+        // Una suite que Bara no sella no se acepta ni siquiera con eco correcto.
+        let con_otra_suite = server_hello(
+            TLS_AES_256_GCM_SHA384,
+            &[0x11_u8; BROWSER_SESSION_ID],
+            &[7_u8; 32],
+            GROUP_X25519,
+            &[9_u8; 32],
+        );
+        assert!(maquina.accept_server_hello(&con_otra_suite).is_none());
+        assert_eq!(maquina.state(), HandshakeState::ClientHelloSent);
+
+        assert!(maquina.accept_server_hello(&respuesta).is_some());
+        assert_eq!(maquina.state(), HandshakeState::ServerHelloReceived);
+        // Sin `EncryptedExtensions`, un `Finished` no cuela; y las claves de
+        // aplicación tampoco existen antes de verificar.
+        assert!(maquina.accept_server_finished(&respuesta).is_none());
+        assert!(maquina.application_keys().is_none());
+        assert!(maquina.client_finished().is_none());
+        assert_eq!(maquina.state(), HandshakeState::ServerHelloReceived);
+
+        let Some(ee) = servidor.sello(&handshake(HS_ENCRYPTED_EXTENSIONS, &extensiones_vacias()))
+        else {
+            return;
+        };
+        assert_eq!(maquina.accept_encrypted_extensions(&ee), Some(Vec::new()));
+
+        // Un `Finished` con etiqueta válida pero `verify_data` mentido rompe el
+        // apretón para siempre: no hay `Established` sin prueba.
+        let mentido = [0x5a_u8; FINISHED_LEN];
+        let Some(registro) = servidor.sello(&finished_message(&mentido)) else {
+            return;
+        };
+        assert!(maquina.accept_server_finished(&registro).is_none());
+        assert_eq!(maquina.state(), HandshakeState::Failed);
+        assert!(maquina.server_verify_data().is_none());
+        assert!(maquina.application_keys().is_none());
+        assert!(maquina.client_finished().is_none());
+        assert!(maquina.start().is_none());
+
+        // Y el transcript manipulable tampoco engaña: cambiar la etiqueta de la
+        // `EncryptedExtensions` invalida el registro antes de llegar al HMAC.
+        let mut otro = HandshakeMachine::new(
+            CamouflageProfile::browser("ejemplo.test"),
+            b"orden-estricto",
+        );
+        let Some(saludo) = otro.start() else { return };
+        let Some((mut segundo, respuesta)) = ServidorDePrueba::nuevo(&saludo, suite) else {
+            return;
+        };
+        assert!(otro.accept_server_hello(&respuesta).is_some());
+        let Some(mut ee) =
+            segundo.sello(&handshake(HS_ENCRYPTED_EXTENSIONS, &extensiones_vacias()))
+        else {
+            return;
+        };
+        if let Some(byte) = ee.last_mut() {
+            *byte ^= 0x01;
+        }
+        assert!(otro.accept_encrypted_extensions(&ee).is_none());
+        assert_eq!(otro.state(), HandshakeState::ServerHelloReceived);
     }
 }

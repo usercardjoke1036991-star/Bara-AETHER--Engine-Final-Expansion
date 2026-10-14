@@ -51,6 +51,7 @@ pub mod quantum_native;
 pub mod repl;
 pub mod runtime;
 pub mod temporal_rollback;
+pub mod visual_builder;
 pub mod zk_proof;
 
 // ─────────────────────────────────────────────────────────────────────────
