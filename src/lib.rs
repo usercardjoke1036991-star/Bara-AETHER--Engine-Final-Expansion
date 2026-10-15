@@ -25,6 +25,10 @@
 //! * [`bsc_bridge`] — puente híbrido con BNB Smart Chain (EVM): RLP, keccak‑256,
 //!   secp256k1/EIP‑155 (Chain ID 56), ABI/BEP‑20 y cliente JSON‑RPC propio; cada
 //!   respuesta se aísla como burbuja de datos antes de tocar el árbol *Shoresh*.
+//! * [`autopoietic`] — autopoiesis soberana: núcleo inmutable (`KernelCore`),
+//!   células *sandbox* de AST, IPC firmado (`SynapseLink`), auditoría estática
+//!   *Shoresh*, compuerta paraconsistente de Belnap y fusión atómica con diff
+//!   para el IDE.
 //!
 //! ## Invariantes globales de la biblioteca
 //! 1. **Sólo `std`** — cero dependencias externas (`Cargo.toml` sin
@@ -40,6 +44,7 @@
 #![forbid(unsafe_code)]
 
 pub mod ast_dna;
+pub mod autopoietic;
 pub mod bsc_bridge;
 pub mod crypto_native;
 pub mod emission;
@@ -65,6 +70,16 @@ pub mod zk_proof;
 pub use bsc_bridge::{
     Address, BridgeError, LegacySignature, LegacyTx, SignedTransaction, SigningKey, BSC_CHAIN_ID,
     U256,
+};
+// La autopoiesis estructural se reexporta sin renombrar su tipo principal: el
+// sintetizador de axiomas semánticos del runtime se llama igual
+// (`runtime::AutopoieticMutator`), así que el mutador de *sandbox* se expone con
+// un alias explícito y se accede completo como `bara::autopoietic::…`.
+pub use autopoietic::{
+    ast_fingerprint, audit_ast, AutopoieticMutator as SandboxMutator, BelnapMatrix, BelnapValue,
+    BelnapVerdict, Capability, CellState, DiffLine, Evidence, Frame, FrameKind, KernelCore,
+    KernelError, KernelRead, Mutation, MutationDiff, MutationRecord, MutatorCounts, MutatorError,
+    Proposal, SandboxCell, SignedFrame, StaticAudit, SynapseGateway, SynapseLink,
 };
 pub use fractal_geometry::{fib_ceil, fibonacci, golden_angle, golden_slots, FractalLayout};
 pub use memory_region::{Device, RegionId, RegionKind};
