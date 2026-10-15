@@ -70,7 +70,7 @@ use std::net::TcpStream;
 use std::time::Duration;
 
 use crate::ast_dna::{ast_dna, golden_key, key_id, merkle_root, node_dna, short_hex, AstDna};
-use crate::crypto_native::{digest_eq, hmac_sha256, hkdf_32, sha256};
+use crate::crypto_native::{digest_eq, hkdf_32, hmac_sha256, sha256};
 use crate::ffi_ingest::{root_from_name, BaraType, ShoreshAst, ShoreshNode};
 use crate::immunity_gateway::{Bubble, Gateway, Packet};
 use crate::net_camouflage::{CamouflageProfile, HttpsSession, CT_ALERT, CT_APPLICATION_DATA};
@@ -840,7 +840,10 @@ pub fn balance_of_call(holder: &Address) -> Vec<u8> {
 
 /// Carga útil de `transfer(address,uint256)` (BEP‑20).
 pub fn transfer_call(to: &Address, amount: &U256) -> Vec<u8> {
-    abi_call("transfer(address,uint256)", &[to.to_abi_word(), amount.to_bytes()])
+    abi_call(
+        "transfer(address,uint256)",
+        &[to.to_abi_word(), amount.to_bytes()],
+    )
 }
 
 /// Lee la primera palabra ABI (32 bytes) como cantidad de 256 bits.
@@ -1001,9 +1004,9 @@ fn mul_wide_le(left: &[u64; 4], right: &[u64; 4]) -> [u64; 8] {
     for (row, left_limb) in left.iter().enumerate() {
         let mut carry = 0u128;
         for (column, right_limb) in right.iter().enumerate() {
-            let value =
-                u128::from(out[row + column]) + u128::from(*left_limb) * u128::from(*right_limb)
-                    + carry;
+            let value = u128::from(out[row + column])
+                + u128::from(*left_limb) * u128::from(*right_limb)
+                + carry;
             out[row + column] = value as u64;
             carry = value >> 64;
         }
@@ -1449,8 +1452,8 @@ fn sign_digest(secret: &[u8; 32], digest: &[u8; 32]) -> Result<LegacySignature, 
             stream.retry();
             continue;
         }
-        let mut recovery = u8::from(!fe_is_even(&y))
-            | (u8::from(fe_cmp(&x, &N) != Ordering::Less) << 1);
+        let mut recovery =
+            u8::from(!fe_is_even(&y)) | (u8::from(fe_cmp(&x, &N) != Ordering::Less) << 1);
         if fe_cmp(&s, &half_order) == Ordering::Greater {
             s = fe_sub_mod(&N, &s, &N);
             recovery ^= 1;
@@ -2162,7 +2165,9 @@ impl Transport for HttpTransport {
         let mut stream = TcpStream::connect(address).map_err(unavailable)?;
         let budget = Duration::from_millis(self.timeout_ms);
         stream.set_read_timeout(Some(budget)).map_err(unavailable)?;
-        stream.set_write_timeout(Some(budget)).map_err(unavailable)?;
+        stream
+            .set_write_timeout(Some(budget))
+            .map_err(unavailable)?;
         let _ = stream.set_nodelay(true);
         stream.write_all(&request).map_err(unavailable)?;
         stream.flush().map_err(unavailable)?;
@@ -2724,7 +2729,11 @@ impl BscClient {
     }
 
     /// Saldo BEP‑20 de un tenedor (`balanceOf` por `eth_call`).
-    pub fn token_balance(&mut self, token: &Address, holder: &Address) -> Result<U256, BridgeError> {
+    pub fn token_balance(
+        &mut self,
+        token: &Address,
+        holder: &Address,
+    ) -> Result<U256, BridgeError> {
         let params = contract_params(token, &balance_of_call(holder));
         decode_word(&self.call_data("eth_call", &params)?)
     }
@@ -3054,11 +3063,13 @@ impl BscTransducer {
         let words = datum.data.chunks(32).take(MAX_SHAPE_NODES).count();
         if words == 0 {
             let label = format!("{}[cantidad]", datum.method);
-            ast.nodes.push(shape_node(&label, BaraType::Number, &bubble));
+            ast.nodes
+                .push(shape_node(&label, BaraType::Number, &bubble));
         }
         for index in 0..words {
             let label = format!("{}[{index}]", datum.method);
-            ast.nodes.push(shape_node(&label, BaraType::Number, &bubble));
+            ast.nodes
+                .push(shape_node(&label, BaraType::Number, &bubble));
         }
 
         let dna = ast_dna(&format!("{}:{}", self.label, datum.method), &ast, &self.key);
@@ -3168,7 +3179,9 @@ impl DataBubble {
         for node in &self.ast.nodes {
             core.memory.store(&node.root, node.valence.clone());
         }
-        let key = core.memory.store(&self.bubble.label, self.bubble.valence.clone());
+        let key = core
+            .memory
+            .store(&self.bubble.label, self.bubble.valence.clone());
         core.push(self.bubble.valence.clone());
         let inserted = core.memory.len().saturating_sub(before);
         self.key = Some(key);
@@ -3180,7 +3193,11 @@ impl DataBubble {
     pub fn describe(&self) -> String {
         let nodes = self.ast.nodes.len();
         let hologram = self.hologram();
-        let state = if self.published { "publicada" } else { "aislada" };
+        let state = if self.published {
+            "publicada"
+        } else {
+            "aislada"
+        };
         format!(
             "{} · {nodes} nodos · ADN {hologram} · {state}",
             self.bubble.describe()
@@ -3208,14 +3225,15 @@ pub fn bridge_round(
 mod pruebas {
     use super::*;
 
-    /// Contrato cualquiera de BEP‑20.
-    fn token() -> Address {
-        Address::from_hex("1111111111111111111111111111111111111111").expect("dirección válida")
+    /// Contrato cualquiera de BEP‑20, en totalidad: `None` si la constante no
+    /// fuera una dirección (la prueba devuelve, no aborta).
+    fn token() -> Option<Address> {
+        Address::from_hex("1111111111111111111111111111111111111111").ok()
     }
 
-    /// Tenedor cualquiera.
-    fn holder() -> Address {
-        Address::from_hex("2222222222222222222222222222222222222222").expect("dirección válida")
+    /// Tenedor cualquiera, con la misma totalidad que [`token`].
+    fn holder() -> Option<Address> {
+        Address::from_hex("2222222222222222222222222222222222222222").ok()
     }
 
     /// Cliente con respuestas guionadas, en orden.
@@ -3234,19 +3252,25 @@ mod pruebas {
 
     #[test]
     fn endpoint_parses_schemes_ports_and_paths() {
-        let bare = Endpoint::parse("nodo.test").expect("host sin esquema");
+        let bare = Endpoint::parse("nodo.test");
+        assert!(bare.is_ok(), "host sin esquema");
+        let Ok(bare) = bare else { return };
         assert_eq!(bare.scheme, Scheme::Bare);
         assert_eq!(bare.port, RPC_DEFAULT_PORT);
         assert_eq!(bare.path, "/");
 
-        let http = Endpoint::parse("http://nodo.test:8545/rpc").expect("url con ruta");
+        let http = Endpoint::parse("http://nodo.test:8545/rpc");
+        assert!(http.is_ok(), "url con ruta");
+        let Ok(http) = http else { return };
         assert_eq!(http.scheme, Scheme::Http);
         assert_eq!(http.port, 8545);
         assert_eq!(http.path, "/rpc");
         assert_eq!(http.authority(), "nodo.test:8545");
         assert_eq!(http.describe(), "http://nodo.test:8545/rpc");
 
-        let https = Endpoint::parse("https://nodo.test").expect("https sin puerto");
+        let https = Endpoint::parse("https://nodo.test");
+        assert!(https.is_ok(), "https sin puerto");
+        let Ok(https) = https else { return };
         assert_eq!(https.port, 443);
         assert_eq!(https.scheme, Scheme::Https);
 
@@ -3257,7 +3281,9 @@ mod pruebas {
 
     #[test]
     fn mainnet_endpoints_come_from_the_module_constants() {
-        let plain = Endpoint::mainnet().expect("extremo público");
+        let plain = Endpoint::mainnet();
+        assert!(plain.is_ok(), "extremo público");
+        let Ok(plain) = plain else { return };
         assert_eq!(plain.host, "bsc-dataseed.binance.org");
         assert_eq!(plain.port, RPC_DEFAULT_PORT);
         assert_eq!(
@@ -3265,7 +3291,9 @@ mod pruebas {
             format!("{BSC_MAINNET_ADDRESS}{BSC_RPC_PATH}")
         );
 
-        let swarm = Endpoint::swarm_mainnet().expect("extremo del enjambre");
+        let swarm = Endpoint::swarm_mainnet();
+        assert!(swarm.is_ok(), "extremo del enjambre");
+        let Ok(swarm) = swarm else { return };
         assert_eq!(swarm.scheme, Scheme::Https);
         assert_eq!(swarm.port, 443);
         assert_eq!(swarm.host, plain.host);
@@ -3273,8 +3301,12 @@ mod pruebas {
 
     #[test]
     fn http_post_has_the_expected_envelope() {
-        let endpoint = Endpoint::parse("http://nodo.test:8545/rpc").expect("extremo");
-        let request = String::from_utf8(endpoint.http_post(b"{\"id\":1}")).expect("petición UTF-8");
+        let endpoint = Endpoint::parse("http://nodo.test:8545/rpc");
+        assert!(endpoint.is_ok(), "extremo");
+        let Ok(endpoint) = endpoint else { return };
+        let request = String::from_utf8(endpoint.http_post(b"{\"id\":1}"));
+        assert!(request.is_ok(), "petición UTF-8");
+        let Ok(request) = request else { return };
         assert!(request.starts_with("POST /rpc HTTP/1.1\r\n"));
         assert!(request.contains("Host: nodo.test:8545\r\n"));
         assert!(request.contains("Content-Length: 8\r\n"));
@@ -3284,14 +3316,13 @@ mod pruebas {
     #[test]
     fn http_transport_talks_to_an_unreachable_endpoint_without_panicking() {
         // Puerto reservado y sin escucha: el fallo es declarado, no un pánico.
-        let transport = HttpTransport::from_url("http://127.0.0.1:9/").expect("extremo local");
+        let transport = HttpTransport::from_url("http://127.0.0.1:9/");
+        assert!(transport.is_ok(), "extremo local");
+        let Ok(transport) = transport else { return };
         assert_eq!(transport.timeout_ms(), HTTP_TIMEOUT_MS);
         assert_eq!(transport.label(), "http");
         assert_eq!(
-            transport
-                .endpoint()
-                .map(Endpoint::describe)
-                .as_deref(),
+            transport.endpoint().map(Endpoint::describe).as_deref(),
             Some("http://127.0.0.1:9/")
         );
         let mut transport = transport.with_timeout(200);
@@ -3380,7 +3411,9 @@ mod pruebas {
         assert_eq!(transport.push_ok(&envelope(1, "\"0x38\"")), 1);
         assert_eq!(transport.queued(), 1);
         let body = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_chainId\",\"params\":[]}";
-        let response = transport.exchange(body).expect("respuesta del guion");
+        let response = transport.exchange(body);
+        assert!(response.is_ok(), "respuesta del guion");
+        let Ok(response) = response else { return };
         assert_eq!(response, envelope(1, "\"0x38\""));
         assert_eq!(transport.queued(), 0);
         assert_eq!(transport.requests().first().map(String::as_str), Some(body));
@@ -3396,17 +3429,12 @@ mod pruebas {
             &envelope(2, "\"0x1b4\""),
             &envelope(3, "\"0x01ff\""),
         ]);
-        assert_eq!(client.chain_id().expect("cadena 56"), BSC_CHAIN_ID);
+        assert_eq!(client.chain_id(), Ok(BSC_CHAIN_ID));
         assert_eq!(
-            client
-                .call_quantity("eth_blockNumber", "[]")
-                .expect("cantidad"),
-            U256::from_u64(0x1b4)
+            client.call_quantity("eth_blockNumber", "[]"),
+            Ok(U256::from_u64(0x1b4))
         );
-        assert_eq!(
-            client.call_data("eth_call", "[]").expect("datos"),
-            vec![0x01, 0xff]
-        );
+        assert_eq!(client.call_data("eth_call", "[]"), Ok(vec![0x01, 0xff]));
         assert_eq!(client.transport_label(), "guion");
         assert_eq!(client.next_id(), 4);
         assert_eq!(client.log().len(), 3);
@@ -3429,7 +3457,8 @@ mod pruebas {
         );
 
         // Un `error` sin código numérico no pierde el mensaje del nodo.
-        let mut odd = scripted(&["{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"message\":\"genérico\"}}"]);
+        let mut odd =
+            scripted(&["{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"message\":\"genérico\"}}"]);
         assert_eq!(
             odd.chain_id(),
             Err(BridgeError::RpcError {
@@ -3477,12 +3506,12 @@ mod pruebas {
         let word = "0x00000000000000000000000000000000000000000000000000000000000000c8";
         let mut transport = LoopbackTransport::new();
         transport.push_ok(&envelope(1, &json_escape(word)));
-        let contract = token();
-        let account = holder();
+        let Some(contract) = token() else { return };
+        let Some(account) = holder() else { return };
         let mut client = BscClient::new(transport);
         assert_eq!(
-            client.token_balance(&contract, &account).expect("saldo"),
-            U256::from_u64(200)
+            client.token_balance(&contract, &account),
+            Ok(U256::from_u64(200))
         );
         let request = client.log().first().cloned().unwrap_or_default();
         assert!(request.contains("eth_call"));
@@ -3499,7 +3528,9 @@ mod pruebas {
 
     #[test]
     fn swarm_transport_demands_an_https_endpoint() {
-        let plain = Endpoint::parse("http://nodo.test:8545").expect("extremo en claro");
+        let plain = Endpoint::parse("http://nodo.test:8545");
+        assert!(plain.is_ok(), "extremo en claro");
+        let Ok(plain) = plain else { return };
         assert!(matches!(
             SwarmTransport::connect(plain, b"semilla"),
             Err(BridgeError::TransportUnavailable(_))
@@ -3508,8 +3539,9 @@ mod pruebas {
     #[test]
     fn datum_decode_classifies_quantities_and_data() {
         let body = envelope(1, "\"0x1b4\"");
-        let quantity =
-            BscDatum::decode("eth_blockNumber", 1, "guion", &body, "0x1b4").expect("cantidad impar");
+        let quantity = BscDatum::decode("eth_blockNumber", 1, "guion", &body, "0x1b4");
+        assert!(quantity.is_ok(), "cantidad impar");
+        let Ok(quantity) = quantity else { return };
         assert_eq!(quantity.quantity, Some(U256::from_u64(0x1b4)));
         assert!(
             quantity.data.is_empty(),
@@ -3525,7 +3557,9 @@ mod pruebas {
         );
         assert!(quantity.describe().contains("eth_blockNumber"));
 
-        let data = BscDatum::decode("eth_call", 2, "guion", &body, "0x01ff").expect("datos pares");
+        let data = BscDatum::decode("eth_call", 2, "guion", &body, "0x01ff");
+        assert!(data.is_ok(), "datos pares");
+        let Ok(data) = data else { return };
         assert_eq!(data.data, vec![0x01, 0xff]);
         assert_eq!(data.quantity, Some(U256::from_u64(0x01ff)));
         assert_eq!(
@@ -3550,9 +3584,9 @@ mod pruebas {
     fn transducer_isolates_the_datum_and_signs_the_tree() {
         let mut transducer = BscTransducer::new("prueba");
         let body = envelope(1, "\"0x38\"");
-        let bubble = transducer
-            .admit_text("eth_chainId", 1, "guion", &body, "0x38")
-            .expect("dato válido");
+        let bubble = transducer.admit_text("eth_chainId", 1, "guion", &body, "0x38");
+        assert!(bubble.is_ok(), "dato válido");
+        let Ok(bubble) = bubble else { return };
         assert!(bubble.is_verified(), "mismo digest por los dos caminos");
         assert!(bubble.is_sealed(), "el ADN corresponde al AST admitido");
         assert!(bubble.is_trustworthy());
@@ -3583,9 +3617,9 @@ mod pruebas {
         let mut transducer = BscTransducer::new("prueba");
         let mut core = BaraRuntime::new();
         let body = envelope(1, "\"0x38\"");
-        let mut bubble = transducer
-            .admit_text("eth_chainId", 1, "guion", &body, "0x38")
-            .expect("dato válido");
+        let bubble = transducer.admit_text("eth_chainId", 1, "guion", &body, "0x38");
+        assert!(bubble.is_ok(), "dato válido");
+        let Ok(mut bubble) = bubble else { return };
         let records = bubble.publish(&mut core);
         assert!(records >= 1, "al menos el registro del propio dato");
         assert!(bubble.published);
@@ -3605,9 +3639,9 @@ mod pruebas {
         // nulo (100), o sea 600 ‰ de peligro y veredicto `⊥`.
         let mut body = "\u{0}".repeat(2000);
         body.push_str(&"b".repeat(3000));
-        let mut bubble = transducer
-            .admit_text("eth_call", 1, "guion", &body, "0x00")
-            .expect("dato hexadecimal válido");
+        let bubble = transducer.admit_text("eth_call", 1, "guion", &body, "0x00");
+        assert!(bubble.is_ok(), "dato hexadecimal válido");
+        let Ok(mut bubble) = bubble else { return };
         assert_eq!(bubble.bubble.danger, 600);
         assert!(!bubble.is_trustworthy());
         assert_eq!(bubble.publish(&mut core), 0);
@@ -3616,9 +3650,9 @@ mod pruebas {
 
         // Sin un solo alfanumérico: ilegible, veredicto `∅` (cuarentena).
         let illegible = "?".repeat(1200);
-        let mut bubble = transducer
-            .admit_text("eth_call", 2, "guion", &illegible, "0x00")
-            .expect("dato hexadecimal válido");
+        let bubble = transducer.admit_text("eth_call", 2, "guion", &illegible, "0x00");
+        assert!(bubble.is_ok(), "dato hexadecimal válido");
+        let Ok(mut bubble) = bubble else { return };
         assert!(!bubble.is_trustworthy());
         assert_eq!(bubble.publish(&mut core), 0);
         assert!(core.memory.is_empty(), "el núcleo queda sin tocar");
@@ -3626,7 +3660,7 @@ mod pruebas {
 
     #[test]
     fn balance_query_builds_its_parameters() {
-        let account = holder();
+        let Some(account) = holder() else { return };
         let query = BscQuery::Balance(account);
         assert_eq!(query.method(), "eth_getBalance");
         assert_eq!(query.shape(), "cantidad");
@@ -3636,11 +3670,13 @@ mod pruebas {
         );
 
         let mut client = scripted(&[&envelope(1, "\"0x0de0b6b3a7640000\"")]);
-        let datum = query.execute(&mut client).expect("saldo del guion");
-        assert_eq!(
-            datum.quantity,
-            Some(U256::from_dec("1000000000000000000").expect("un ether"))
-        );
+        let datum = query.execute(&mut client);
+        assert!(datum.is_ok(), "saldo del guion");
+        let Ok(datum) = datum else { return };
+        let ether = U256::from_dec("1000000000000000000");
+        assert!(ether.is_ok(), "un ether");
+        let Ok(ether) = ether else { return };
+        assert_eq!(datum.quantity, Some(ether));
         assert!(client
             .log()
             .first()
@@ -3649,18 +3685,23 @@ mod pruebas {
 
     #[test]
     fn broadcast_query_sends_the_raw_transaction() {
-        let key = SigningKey::from_bytes(&[0x11_u8; 32]).expect("clave dentro de rango");
+        let key = SigningKey::from_bytes(&[0x11_u8; 32]);
+        assert!(key.is_ok(), "clave dentro de rango");
+        let Ok(key) = key else { return };
+        let price = U256::from_dec("5000000000");
+        assert!(price.is_ok(), "precio");
+        let Ok(price) = price else { return };
         let template = LegacyTx {
             nonce: U256::from_u64(3),
-            gas_price: U256::from_dec("5000000000").expect("precio"),
+            gas_price: price,
             gas_limit: U256::from_u64(21000),
-            to: Some(holder()),
+            to: holder(),
             value: U256::from_u64(1),
             data: Vec::new(),
         };
-        let transaction = key
-            .sign_transaction(&template, BSC_CHAIN_ID)
-            .expect("transacción firmada");
+        let transaction = key.sign_transaction(&template, BSC_CHAIN_ID);
+        assert!(transaction.is_ok(), "transacción firmada");
+        let Ok(transaction) = transaction else { return };
 
         let hash = "0x".to_string() + &hex_encode(&transaction.hash);
         let mut client = scripted(&[&envelope(1, &json_escape(&hash))]);
@@ -3669,7 +3710,9 @@ mod pruebas {
         assert_eq!(query.shape(), "hash");
         assert!(query.params().contains(&transaction.raw_hex()));
 
-        let datum = query.execute(&mut client).expect("hash de difusión");
+        let datum = query.execute(&mut client);
+        assert!(datum.is_ok(), "hash de difusión");
+        let Ok(datum) = datum else { return };
         assert_eq!(datum.data.len(), 32);
         assert_eq!(datum.data, transaction.hash.to_vec());
     }
@@ -3679,8 +3722,9 @@ mod pruebas {
         let mut client = scripted(&[&envelope(1, "\"0x38\"")]);
         let mut transducer = BscTransducer::new("ronda");
         let mut core = BaraRuntime::new();
-        let bubble = bridge_round(&mut client, &mut transducer, &BscQuery::ChainId, &mut core)
-            .expect("ronda completa");
+        let bubble = bridge_round(&mut client, &mut transducer, &BscQuery::ChainId, &mut core);
+        assert!(bubble.is_ok(), "ronda completa");
+        let Ok(bubble) = bubble else { return };
         assert!(bubble.is_trustworthy());
         assert!(bubble.published);
         assert!(bubble.key.is_some());
@@ -3688,7 +3732,10 @@ mod pruebas {
         assert_eq!(bubble.datum.transport, "guion");
         assert_eq!(bubble.datum.quantity, Some(U256::from_u64(BSC_CHAIN_ID)));
         assert_eq!(transducer.admitted(), 1);
-        assert!(!core.memory.is_empty(), "la memoria holográfica recibió la ronda");
+        assert!(
+            !core.memory.is_empty(),
+            "la memoria holográfica recibió la ronda"
+        );
     }
 }
 // ─────────────────────────────────────────────────────────────────────────

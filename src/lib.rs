@@ -62,7 +62,10 @@ pub mod zk_proof;
 // Reexportaciones de conveniencia
 // ─────────────────────────────────────────────────────────────────────────
 
-pub use bsc_bridge::{Address, BridgeError, LegacySignature, LegacyTx, SignedTransaction, SigningKey, U256, BSC_CHAIN_ID};
+pub use bsc_bridge::{
+    Address, BridgeError, LegacySignature, LegacyTx, SignedTransaction, SigningKey, BSC_CHAIN_ID,
+    U256,
+};
 pub use fractal_geometry::{fib_ceil, fibonacci, golden_angle, golden_slots, FractalLayout};
 pub use memory_region::{Device, RegionId, RegionKind};
 pub use quantum_native::{Amplitude, BellPhase};

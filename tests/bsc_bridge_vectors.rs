@@ -11,7 +11,8 @@ use bara::bsc_bridge::*;
 const EIP155_SIGNING_PAYLOAD: &str =
     "ec098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a764000080018080";
 /// Digest de esa carga firmable.
-const EIP155_SIGNING_HASH: &str = "daf5a779ae972f972197303d7b574746c7ef83eadac0f2791ad23db92e4c8e53";
+const EIP155_SIGNING_HASH: &str =
+    "daf5a779ae972f972197303d7b574746c7ef83eadac0f2791ad23db92e4c8e53";
 /// Transacción firmada que publica el EIP (adviértase el `v = 37`).
 const EIP155_SIGNED_TX: &str = concat!(
     "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a7640000",
@@ -34,7 +35,9 @@ fn eip155_transaction() -> LegacyTx {
         nonce: U256::from_u64(9),
         gas_price: U256::from_dec("20000000000").expect("precio de gas del ejemplo"),
         gas_limit: U256::from_u64(21000),
-        to: Some(Address::from_hex("3535353535353535353535353535353535353535").expect("destinatario")),
+        to: Some(
+            Address::from_hex("3535353535353535353535353535353535353535").expect("destinatario"),
+        ),
         value: U256::from_dec("1000000000000000000").expect("valor del ejemplo"),
         data: Vec::new(),
     }
@@ -61,9 +64,15 @@ fn keccak256_matches_published_vectors() {
         "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
     );
     // El selector no es más que el prefijo del hash anterior.
-    assert_eq!(hex_encode(&selector("Transfer(address,address,uint256)")), "ddf252ad");
+    assert_eq!(
+        hex_encode(&selector("Transfer(address,address,uint256)")),
+        "ddf252ad"
+    );
     assert_eq!(hex_encode(&selector("balanceOf(address)")), "70a08231");
-    assert_eq!(hex_encode(&selector("transfer(address,uint256)")), "a9059cbb");
+    assert_eq!(
+        hex_encode(&selector("transfer(address,uint256)")),
+        "a9059cbb"
+    );
 }
 
 #[test]
@@ -72,7 +81,12 @@ fn public_keys_and_addresses_match_known_keys() {
     let mut three = [0u8; 32];
     three[31] = 3;
     assert_eq!(
-        hex_encode(&SigningKey::from_bytes(&three).expect("k=3").public_key().expect("3·G")),
+        hex_encode(
+            &SigningKey::from_bytes(&three)
+                .expect("k=3")
+                .public_key()
+                .expect("3·G")
+        ),
         concat!(
             "f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
             "388f7b0f632de8140fe337e62a37f3566500a99934c2231b6cb9fd7584b8e672"
@@ -81,7 +95,12 @@ fn public_keys_and_addresses_match_known_keys() {
     let mut four = [0u8; 32];
     four[31] = 4;
     assert_eq!(
-        hex_encode(&SigningKey::from_bytes(&four).expect("k=4").public_key().expect("4·G")),
+        hex_encode(
+            &SigningKey::from_bytes(&four)
+                .expect("k=4")
+                .public_key()
+                .expect("4·G")
+        ),
         concat!(
             "e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13",
             "51ed993ea0d455b75642e2098ea51448d967ae33bfbdfe40cfe97bdc47739922"
@@ -92,13 +111,19 @@ fn public_keys_and_addresses_match_known_keys() {
     let mut one = [0u8; 32];
     one[31] = 1;
     assert_eq!(
-        SigningKey::from_bytes(&one).expect("k=1").address().to_checksum(),
+        SigningKey::from_bytes(&one)
+            .expect("k=1")
+            .address()
+            .to_checksum(),
         "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf"
     );
     let mut two = [0u8; 32];
     two[31] = 2;
     assert_eq!(
-        SigningKey::from_bytes(&two).expect("k=2").address().to_checksum(),
+        SigningKey::from_bytes(&two)
+            .expect("k=2")
+            .address()
+            .to_checksum(),
         "0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF"
     );
 }
@@ -107,21 +132,32 @@ fn public_keys_and_addresses_match_known_keys() {
 fn eip55_checksum_matches_the_spec_vector() {
     let address = Address::from_hex("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed")
         .expect("dirección del ejemplo");
-    assert_eq!(address.to_checksum(), "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+    assert_eq!(
+        address.to_checksum(),
+        "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"
+    );
 }
-
 
 #[test]
 fn rlp_matches_canonical_examples() {
     assert_eq!(hex_encode(&rlp_encode(&rlp_data(b"dog"))), "83646f67");
     assert_eq!(
-        hex_encode(&rlp_encode(&rlp_list(vec![rlp_data(b"cat"), rlp_data(b"dog")]))),
+        hex_encode(&rlp_encode(&rlp_list(vec![
+            rlp_data(b"cat"),
+            rlp_data(b"dog")
+        ]))),
         "c88363617483646f67"
     );
     // El cero y las cantidades de un solo byte se codifican sin prefijo de longitud.
     assert_eq!(hex_encode(&rlp_encode(&rlp_quantity(&U256::ZERO))), "80");
-    assert_eq!(hex_encode(&rlp_encode(&rlp_quantity(&U256::from_u64(127)))), "7f");
-    assert_eq!(hex_encode(&rlp_encode(&rlp_quantity(&U256::from_u64(1024)))), "820400");
+    assert_eq!(
+        hex_encode(&rlp_encode(&rlp_quantity(&U256::from_u64(127)))),
+        "7f"
+    );
+    assert_eq!(
+        hex_encode(&rlp_encode(&rlp_quantity(&U256::from_u64(1024)))),
+        "820400"
+    );
     let decoded = rlp_decode(&hex_decode("c88363617483646f67").expect("hex")).expect("RLP válido");
     assert_eq!(decoded.arity(), Some(2));
 }
@@ -159,11 +195,24 @@ fn signed_transaction_decodes_back_to_its_signer() {
     let decoded = LegacyTx::decode_signed(&raw).expect("el vector debe decodificarse");
     assert_eq!(decoded.chain_id, 1);
     assert_eq!(decoded.sender, eip155_key().address());
-    assert_eq!(decoded.digest.as_slice(), hex_decode(EIP155_SIGNING_HASH).expect("hex").as_slice());
-    assert_eq!(decoded.signature.r.as_slice(), hex_decode(EIP155_R).expect("hex").as_slice());
-    assert_eq!(decoded.signature.s.as_slice(), hex_decode(EIP155_S).expect("hex").as_slice());
+    assert_eq!(
+        decoded.digest.as_slice(),
+        hex_decode(EIP155_SIGNING_HASH).expect("hex").as_slice()
+    );
+    assert_eq!(
+        decoded.signature.r.as_slice(),
+        hex_decode(EIP155_R).expect("hex").as_slice()
+    );
+    assert_eq!(
+        decoded.signature.s.as_slice(),
+        hex_decode(EIP155_S).expect("hex").as_slice()
+    );
     assert_eq!(decoded.raw, raw);
-    assert!(verify_digest(&decoded.digest, &decoded.signature, &decoded.sender));
+    assert!(verify_digest(
+        &decoded.digest,
+        &decoded.signature,
+        &decoded.sender
+    ));
 
     // Y el ida y vuelta propio del puente (firmar → serializar → decodificar).
     let signed = eip155_key()
@@ -202,13 +251,17 @@ fn signature_is_low_s_per_eip2() {
             &U256::from_u64(99),
         ),
     };
-    let signed = key.sign_transaction(&tx, BSC_CHAIN_ID).expect("firma en BSC");
+    let signed = key
+        .sign_transaction(&tx, BSC_CHAIN_ID)
+        .expect("firma en BSC");
     assert!(signed.signature.s <= HALF_ORDER);
     let v = signed.signature.v(BSC_CHAIN_ID);
     assert!((2 * BSC_CHAIN_ID + 35..=2 * BSC_CHAIN_ID + 36).contains(&v));
 
     // La firma es reproducible: el mismo par (clave, mensaje) da los mismos bytes.
-    let repeated = key.sign_transaction(&tx, BSC_CHAIN_ID).expect("segunda firma");
+    let repeated = key
+        .sign_transaction(&tx, BSC_CHAIN_ID)
+        .expect("segunda firma");
     assert_eq!(signed.raw, repeated.raw);
     assert_eq!(signed.signature, repeated.signature);
     assert_eq!(
@@ -277,8 +330,14 @@ fn abi_helpers_build_bep20_payloads() {
     // `balanceOf(address)`: selector + la dirección rellenada a 32 bytes.
     let balance = balance_of_call(&holder);
     assert_eq!(balance.len(), 36);
-    assert_eq!(hex_encode(&balance[..4]), hex_encode(&selector("balanceOf(address)")));
-    assert_eq!(hex_encode(&balance[4..]), format!("{}{}", "0".repeat(24), hex_encode(holder.as_bytes())));
+    assert_eq!(
+        hex_encode(&balance[..4]),
+        hex_encode(&selector("balanceOf(address)"))
+    );
+    assert_eq!(
+        hex_encode(&balance[4..]),
+        format!("{}{}", "0".repeat(24), hex_encode(holder.as_bytes()))
+    );
     assert_eq!(
         decode_word(&balance[4..]).expect("palabra ABI"),
         U256::from_be_bytes(holder.to_abi_word())
@@ -288,7 +347,10 @@ fn abi_helpers_build_bep20_payloads() {
     let amount = U256::from_u64(1234);
     let transfer = transfer_call(&holder, &amount);
     assert_eq!(transfer.len(), 68);
-    assert_eq!(hex_encode(&transfer[..4]), hex_encode(&selector("transfer(address,uint256)")));
+    assert_eq!(
+        hex_encode(&transfer[..4]),
+        hex_encode(&selector("transfer(address,uint256)"))
+    );
     assert_eq!(transfer[4..36], holder.to_abi_word());
     assert_eq!(hex_encode(&transfer[36..]), hex_encode(&amount.to_bytes()));
     assert_eq!(decode_word(&transfer[36..]).expect("importe"), amount);
