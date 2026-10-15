@@ -22,6 +22,9 @@
 //! * [`metal_ir`] — *layout* abstracto de registros, ISA de 32 bits y bypass del
 //!   driver.
 //! * [`repl`] — oráculo REPL: lengua natural → programa *Shoresh*.
+//! * [`bsc_bridge`] — puente híbrido con BNB Smart Chain (EVM): RLP, keccak‑256,
+//!   secp256k1/EIP‑155 (Chain ID 56), ABI/BEP‑20 y cliente JSON‑RPC propio; cada
+//!   respuesta se aísla como burbuja de datos antes de tocar el árbol *Shoresh*.
 //!
 //! ## Invariantes globales de la biblioteca
 //! 1. **Sólo `std`** — cero dependencias externas (`Cargo.toml` sin
@@ -37,6 +40,7 @@
 #![forbid(unsafe_code)]
 
 pub mod ast_dna;
+pub mod bsc_bridge;
 pub mod crypto_native;
 pub mod emission;
 pub mod ffi_ingest;
@@ -58,6 +62,7 @@ pub mod zk_proof;
 // Reexportaciones de conveniencia
 // ─────────────────────────────────────────────────────────────────────────
 
+pub use bsc_bridge::{Address, BridgeError, LegacySignature, LegacyTx, SignedTransaction, SigningKey, U256, BSC_CHAIN_ID};
 pub use fractal_geometry::{fib_ceil, fibonacci, golden_angle, golden_slots, FractalLayout};
 pub use memory_region::{Device, RegionId, RegionKind};
 pub use quantum_native::{Amplitude, BellPhase};

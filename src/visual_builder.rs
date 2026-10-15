@@ -84,7 +84,7 @@ pub const MIN_CELL_DISTANCE: f64 = 0.28;
 /// Valor JSON. El objeto conserva el **orden** de las claves: el informe es
 /// reproducible y las claves repetidas se detectan al insertarlas.
 #[derive(Debug, Clone, PartialEq)]
-enum Json {
+pub(crate) enum Json {
     /// `null`.
     Null,
     /// `true` / `false`.
@@ -101,7 +101,7 @@ enum Json {
 
 impl Json {
     /// Cadena, si el valor lo es.
-    fn as_text(&self) -> Option<&str> {
+    pub(crate) fn as_text(&self) -> Option<&str> {
         match self {
             Json::Text(text) => Some(text.as_str()),
             _ => None,
@@ -109,7 +109,7 @@ impl Json {
     }
 
     /// Número, si el valor lo es.
-    fn as_number(&self) -> Option<f64> {
+    pub(crate) fn as_number(&self) -> Option<f64> {
         match self {
             Json::Number(value) => Some(*value),
             _ => None,
@@ -117,9 +117,32 @@ impl Json {
     }
 
     /// Secuencia, si el valor lo es.
-    fn as_array(&self) -> Option<&[Json]> {
+    pub(crate) fn as_array(&self) -> Option<&[Json]> {
         match self {
             Json::Array(items) => Some(items.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Objeto como pares en orden de aparición, si el valor lo es.
+    ///
+    /// Lo comparte el puente BSC ([`crate::bsc_bridge`]) para leer los sobres
+    /// JSON‑RPC: la respuesta se inspecciona tal cual llegó, sin copias
+    /// divergentes del documento.
+    pub(crate) fn as_object(&self) -> Option<&[(String, Json)]> {
+        match self {
+            Json::Object(entries) => Some(entries.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Miembro de un objeto, si el valor es objeto y la clave existe.
+    pub(crate) fn member(&self, key: &str) -> Option<&Json> {
+        match self {
+            Json::Object(entries) => entries
+                .iter()
+                .find(|(name, _)| name == key)
+                .map(|(_, value)| value),
             _ => None,
         }
     }
@@ -401,7 +424,13 @@ fn compose_unit(unit: u16, scanner: &mut Scanner<'_>) -> Option<char> {
 }
 
 /// Parsea un documento JSON **estricto**: exactamente un valor y nada más.
-fn parse_json(input: &str) -> Option<Json> {
+///
+/// Es el mismo escáner que valida los lienzos del constructor visual; el puente
+/// BSC ([`crate::bsc_bridge`]) lo reutiliza para leer las respuestas JSON‑RPC en
+/// lugar de traer un segundo analizador. Los topes (profundidad [`MAX_JSON_DEPTH`],
+/// claves repetidas y [`MAX_BLUEPRINT_BYTES`]) se aplican también ahí: una
+/// respuesta que los exceda se rechaza en vez de aceptarse a medias.
+pub(crate) fn parse_json(input: &str) -> Option<Json> {
     if input.len() > MAX_BLUEPRINT_BYTES {
         return None;
     }
