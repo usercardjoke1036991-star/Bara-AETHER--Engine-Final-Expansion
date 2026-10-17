@@ -203,8 +203,8 @@ cargo run --release --bin bara_oracle -- --bare --no-live -s "ברא שמר עב
 # El manifiesto también puede llegar por stdin (`-`)
 type manifests\shoresh_manifest.bara | cargo run --release --bin bara_oracle -- --no-live -
 
-# Suite completa: 59 unitarias + 8 áureas + 33 de integración + 10 de estrés
-# (110 en el crate `bara`; 144 en el workspace, con las 34 de `bara-ide`)
+# Suite completa: 175 unitarias + 71 de integración
+# (246 en el crate `bara`; 286 en el workspace, con las 40 de `bara-ide`)
 cargo test
 cargo test --release -- --nocapture
 ```
@@ -310,14 +310,48 @@ $ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
 | `tests/integration_suite.rs` | 1685 | **33** | léxico, runtime/Belnap, memoria holográfica, autopoiesis, regiones, ZK‑SNARK, FFI (C/Python/**JSON/TypeScript** + ingesta omnívora y censo de Belnap), `Δ⁻¹`, cuántica/Bell, malla (bus vs hilos), códec *wire*, Metal‑IR, oráculo REPL, manifiestos, muestras `samples/*.bara`, pipeline nativo |
 | `tests/stress_test.rs` | 596 | **10** | PRNG SplitMix64 propio: inundación de paradojas, rollback profundo, mutación masiva del AST, tormenta de memoria, fuente adversarial, tormenta de conflictos en la malla, tormenta cuántica, presión de Metal‑IR, tormenta FFI, conversación hostil del oráculo |
 | `tests/fractal_suite.rs` | 330 | **8** | geometría áurea: Fibonacci exacto y saturante, proporción `φ` y `fib_ceil`, serie armónica, reparto por pasos áureos (uniforme y heterogéneo) y orden áureo estable |
+| `tests/chaos_resilience.rs` | 1617 | **10** | caos determinista: saturación de la pasarela, ruido binario y anidamiento, corrupción de frontera, sandbox suicida (aislamiento + purga con el núcleo byte a byte intacto), **aridad desbordada juzgada y vetada**, consenso/veto de Belnap y asedio cognitivo del lenguaje |
+| `tests/bsc_bridge_vectors.rs` | 360 | **10** | puente BSC: parámetros de consulta, sobres y datos, cantidades frente a datos, endpoints, errores RPC y resultados nulos |
 
 Los *tests* enlazan el mismo *kernel* (`use bara::…`), por lo que no hay copias
 divergentes de los tipos: lo que pasa en las pruebas es lo que ejecuta el binario.
-A esas **51** pruebas de integración se suman las **59 unitarias** de `src/**`
+A esas **71** pruebas de integración se suman las **175 unitarias** de `src/**`
 —léxico, runtime, memoria regional, ZK, cripto nativa contra los vectores de sus
 RFC, ADN firmado, emisión WASM/ELF64, puerta de inmunidad, camuflaje TLS, ingesta
-FFI, geometría áurea y constructor visual—, para un total de **110** en el crate
-`bara` (**144** en el workspace, con las **34** de `bara-ide`).
+FFI, geometría áurea y constructor visual—, para un total de **246** en el crate
+`bara` (**286** en el workspace, con las **40** de `bara-ide`).
+
+### Banco de metal y caos (fase de integración 6)
+
+`benches/kernel_bench.rs` mide el coste de la inmunidad y verifica que no abre
+canales laterales ni degrada con la escala. Usa **sólo `std`** (sin `criterion`):
+compila sin red y sin dependencias de desarrollo.
+
+```bash
+cargo bench -p bara --bench kernel_bench   # medición completa (perfil bench/release)
+cargo test  -p bara --benches              # modo humo: 16 muestras, mismas invariantes
+```
+
+| Frente | Qué se mide | Invariante que se exige |
+|---|---|---|
+| Tiempo constante | SHA‑256 (4 KiB), `threat_of`, `is_legible` y `screen_bytes` con cargas de **igual longitud** y distinto contenido | desvío de medianas ≤ **4×**; una fuga real se delata en múltiplos |
+| Tzimtzum L1/L2 | `contract` (32 y 1024 nodos), `expand`, `digest`, re‑cuantización | `Record` = 16 B · `Row` = 64 B · sobre = 512 B contiguos · `fill() == 1.0` · derrame contado · coste por nodo sin crecimiento superlineal |
+| Concurrencia | 4 hilos × 64 sobres con `std::thread::scope` | mismo digest en todos los hilos y coste por nodo ≤ 8× el serie |
+| Núcleo y sandbox | `KernelRead::verified`, `KernelCore::digest`, ciclo de célula y `isolate` | digest y revisión intactos; aislamiento limpio |
+| Perfiles | manifiestos del kernel y del workspace | `opt-level=3` · `lto=true` · `codegen-units=1` · `panic="abort"` · `debug_assertions` apagado en modo banco |
+
+Medición de referencia (Windows, perfil `bench`, una pasada): SHA‑256 4 KiB
+≈ 32 µs (≈120 MiB/s), `threat_of` ≈ 2.8 µs/512 B (desvío 1.16×), `contract` de
+32 nodos ≈ 5.3 µs (166 ns/nodo) y de 1024 nodos ≈ 34 ns/nodo (derrame contado),
+`isolate` ≈ 4.1 µs, `KernelCore::digest` ≈ 1.0 µs. Las cifras son orientativas:
+las **cotas** son relativas y no dependen de la velocidad del runner.
+
+El frente de caos vive en `tests/chaos_resilience.rs` (10 pruebas): además de la
+avalancha de ruido, el presupuesto del sandbox y el veto de Belnap, incluye
+`la_aridad_desbordada_se_juzga_y_nunca_se_fusiona`, que satura la pasarela con
+declaraciones de aridad 64 y demuestra que la puerta sigue abierta (no descarta
+nada), que el juicio tetravalente las veta por violación estructural y que el
+`KernelCore` conserva digest y revisión.
 
 ## Salida de ejemplo
 

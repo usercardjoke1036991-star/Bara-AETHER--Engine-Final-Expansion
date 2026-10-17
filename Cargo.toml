@@ -36,4 +36,16 @@ path = "src/lib.rs"
 #   * `panic = "abort"`   — el kernel es total y TOLERANTE (jamás entra en
 #                           pánico); abortar en vez de desenrollar recorta el
 #                           *prologue* y habilita optimizaciones `nounwind`.
+# ─────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────
+# Fase 6 · banco de metal (arnés propio, sin `criterion`)
+# ─────────────────────────────────────────────────────────────────────────
+# `harness = false`: el binario es el banco, no libtest. `cargo bench` le pasa
+# `--bench`; `cargo test --all-targets` lo ejecuta en modo humo (pocas muestras,
+# mismas invariantes) para que la suite siga siendo verde y rápida.
+[[bench]]
+name = "kernel_bench"
+path = "benches/kernel_bench.rs"
+harness = false
 

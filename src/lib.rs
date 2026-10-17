@@ -25,6 +25,10 @@
 //! * [`bsc_bridge`] — puente híbrido con BNB Smart Chain (EVM): RLP, keccak‑256,
 //!   secp256k1/EIP‑155 (Chain ID 56), ABI/BEP‑20 y cliente JSON‑RPC propio; cada
 //!   respuesta se aísla como burbuja de datos antes de tocar el árbol *Shoresh*.
+//! * [`topology`] — enrutamiento estático sin tablas: capas
+//!   `Sovereign → Periphery → Cell → Observer` con aristas ZST y descenso
+//!   unidireccional garantizado por tipos; contracción *Tzimtzum* de la
+//!   información en registros de 16 B y filas de una línea de caché L1.
 //! * [`autopoietic`] — autopoiesis soberana: núcleo inmutable (`KernelCore`),
 //!   células *sandbox* de AST, IPC firmado (`SynapseLink`), auditoría estática
 //!   *Shoresh*, compuerta paraconsistente de Belnap y fusión atómica con diff
@@ -46,10 +50,13 @@
 pub mod ast_dna;
 pub mod autopoietic;
 pub mod bsc_bridge;
+pub mod cognitive;
 pub mod crypto_native;
 pub mod emission;
 pub mod ffi_ingest;
 pub mod fractal_geometry;
+pub mod ide_bridge;
+pub mod immune;
 pub mod immunity_gateway;
 pub mod lexer;
 pub mod memory_region;
@@ -60,6 +67,7 @@ pub mod quantum_native;
 pub mod repl;
 pub mod runtime;
 pub mod temporal_rollback;
+pub mod topology;
 pub mod visual_builder;
 pub mod zk_proof;
 
