@@ -33,6 +33,19 @@
 //!   células *sandbox* de AST, IPC firmado (`SynapseLink`), auditoría estática
 //!   *Shoresh*, compuerta paraconsistente de Belnap y fusión atómica con diff
 //!   para el IDE.
+//! * [`immunity_gateway`] — Puerta Abierta con Inmunidad Absoluta: toda carga
+//!   externa se confina en una burbuja holográfica y Belnap absorbe la
+//!   contradicción antes de que roce el núcleo.
+//! * [`flight_recorder`] — caja negra de vuelo: anillo estático de 1024
+//!   entradas, escritura atómica sin bloqueo y volcado *post-mortem* de sólo
+//!   lectura; guarda el código del incidente y una huella de 64 bits, nunca la
+//!   carga.
+//! * [`transmuter`] — transmutador universal: cualquier fragmento de código o
+//!   prosa se segmenta en sentencias, se clasifica en un concepto *Shoresh* y
+//!   se colapsa a un veredicto de Belnap; lo hostil o ilegible se sella en
+//!   cuarentena (`רחק`), nunca se ejecuta.
+//! * [`ffi`] — frontera `extern "C"` para Android/JNI: estructuras planas
+//!   `#[repr(C)]`, ningún puntero en el ABI y todo fallo como número.
 //!
 //! ## Invariantes globales de la biblioteca
 //! 1. **Sólo `std`** — cero dependencias externas (`Cargo.toml` sin
@@ -43,31 +56,43 @@
 //!    de hashes FNV‑1a estables. Los campos de métricas de reloj de pared
 //!    (`micros`, `Delta.at_micros`) están marcados como **NO DETERMINISTAS**:
 //!    quedan fuera de comparaciones, huellas y firmas.
-//! 4. **Sin `unsafe`** — el *kernel* entero es Rust seguro.
+//! 4. **Sin `unsafe`** — el *kernel* entero es Rust seguro. La única excepción
+//!    es el atributo `#[no_mangle]` de la frontera FFI (`src/ffi.rs`), que rustc
+//!    clasifica como `unsafe` desde 1.82: el crate usa `deny(unsafe_code)` y
+//!    concede `allow(unsafe_code)` **sólo** a ese módulo, que no contiene ni un
+//!    bloque `unsafe` (lo verifica su propia prueba de auditoría).
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 pub mod ast_dna;
+pub mod autopoiesis;
 pub mod autopoietic;
 pub mod bsc_bridge;
 pub mod cognitive;
 pub mod crypto_native;
 pub mod emission;
+#[allow(unsafe_code)] // sólo para `#[no_mangle]`; ver la cabecera de `src/ffi.rs`
+pub mod ffi;
 pub mod ffi_ingest;
+pub mod flight_recorder;
 pub mod fractal_geometry;
 pub mod ide_bridge;
 pub mod immune;
 pub mod immunity_gateway;
+pub mod inference;
 pub mod lexer;
+pub mod long_term_memory;
 pub mod memory_region;
 pub mod mesh_sync;
 pub mod metal_ir;
 pub mod net_camouflage;
+pub mod neural_bridge;
 pub mod quantum_native;
 pub mod repl;
 pub mod runtime;
 pub mod temporal_rollback;
 pub mod topology;
+pub mod transmuter;
 pub mod visual_builder;
 pub mod zk_proof;
 

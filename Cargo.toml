@@ -13,6 +13,10 @@ readme = "README.md"
 [lib]
 name = "bara"
 path = "src/lib.rs"
+# `rlib` para los consumidores Rust (IDE, CLI, suite de integración) y `cdylib`
+# para la frontera FFI: `cargo build --release --target aarch64-linux-android`
+# produce `libbara.so` con los símbolos `bara_ffi_*` de `src/ffi.rs`.
+crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 

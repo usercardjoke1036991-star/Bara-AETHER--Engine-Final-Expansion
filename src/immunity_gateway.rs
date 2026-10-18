@@ -52,6 +52,7 @@ use std::time::Duration;
 use crate::ast_dna::{merkle_root, short_hex};
 use crate::crypto_native::{chacha20_xor, sha256};
 use crate::ffi_ingest::{ingest_auto, to_shoresh, ShoreshAst};
+use crate::flight_recorder::{self, EventKind, ViolationCode};
 use crate::fractal_geometry::fib_ceil;
 use crate::memory_region::{RegionId, RegionKind, RegionTable};
 use crate::runtime::{BaraRuntime, HolographicMemory, Observation, QuantumState};
@@ -756,6 +757,33 @@ impl Gateway {
         let label = format!("burbuja:{id}:{}", short_hex(&dna[..4]));
         // Escritura idempotente: si la etiqueta se repite, no hay entropía.
         self.memory.store(&label, valence.clone());
+
+        // Caja negra: sólo la anomalía deja rastro y el rastro es la huella del
+        // digest que la burbuja ya calculó —nunca la carga, nunca el texto—.
+        match verdict {
+            BubbleVerdict::Innocuous => {}
+            BubbleVerdict::Absorbed => {
+                flight_recorder::record_digest(
+                    EventKind::BelnapConflictBoth,
+                    ViolationCode::ContradictionRetained,
+                    &payload_digest,
+                );
+            }
+            BubbleVerdict::Neutralized => {
+                flight_recorder::record_digest(
+                    EventKind::PerimeterAlert,
+                    ViolationCode::PerimeterThreat,
+                    &payload_digest,
+                );
+            }
+            BubbleVerdict::Quarantined => {
+                flight_recorder::record_digest(
+                    EventKind::VerdictRejected,
+                    ViolationCode::IllegiblePayload,
+                    &payload_digest,
+                );
+            }
+        }
 
         let text = String::from_utf8_lossy(payload);
         let ast = to_shoresh(&ingest_auto(&text));

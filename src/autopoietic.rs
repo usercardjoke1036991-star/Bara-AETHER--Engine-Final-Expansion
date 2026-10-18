@@ -92,6 +92,7 @@
 use crate::ast_dna::{self, AstDna};
 use crate::crypto_native::{digest_eq, hmac_sha256, sha256};
 use crate::ffi_ingest::{BaraType, ShoreshAst, ShoreshNode};
+use crate::flight_recorder::{self, EventKind, ViolationCode};
 use crate::immunity_gateway;
 use crate::runtime::{Observation, QuantumState};
 use crate::visual_builder::triconsonantal;
@@ -693,10 +694,18 @@ impl SynapseGateway {
     }
 
     /// Traduce bytes externos: nada entra al árbol *Shoresh* sin pasar aquí.
+    ///
+    /// Los cuatro rechazos posibles quedan además en la caja negra con un
+    /// [`ViolationCode`] distinto: el incidente es reproducible sin la carga.
     pub fn translate(&mut self, raw: &[u8]) -> Result<Frame, KernelError> {
         if raw.len() > MAX_FRAME {
             self.counters.oversized = self.counters.oversized.saturating_add(1);
             self.counters.rejected = self.counters.rejected.saturating_add(1);
+            flight_recorder::record_fingerprint(
+                EventKind::VerdictRejected,
+                ViolationCode::FrameTooLarge,
+                flight_recorder::fingerprint(raw),
+            );
             return Err(KernelError::FrameTooLarge {
                 found: raw.len(),
                 limit: MAX_FRAME,
@@ -706,17 +715,32 @@ impl SynapseGateway {
             Some(signed) => signed,
             None => {
                 self.counters.rejected = self.counters.rejected.saturating_add(1);
+                flight_recorder::record_fingerprint(
+                    EventKind::VerdictRejected,
+                    ViolationCode::MalformedFrame,
+                    flight_recorder::fingerprint(raw),
+                );
                 return Err(KernelError::MalformedFrame { marker: "forma" });
             }
         };
         if !signed.verify(&self.key) {
             self.counters.tampered = self.counters.tampered.saturating_add(1);
             self.counters.rejected = self.counters.rejected.saturating_add(1);
+            flight_recorder::record_fingerprint(
+                EventKind::VerdictRejected,
+                ViolationCode::SignatureMismatch,
+                flight_recorder::fingerprint(raw),
+            );
             return Err(KernelError::SignatureMismatch);
         }
         if signed.frame.sequence < self.expected {
             self.counters.tampered = self.counters.tampered.saturating_add(1);
             self.counters.rejected = self.counters.rejected.saturating_add(1);
+            flight_recorder::record_fingerprint(
+                EventKind::VerdictRejected,
+                ViolationCode::SequenceRegression,
+                flight_recorder::fingerprint(raw),
+            );
             return Err(KernelError::SequenceRegression {
                 expected: self.expected,
                 found: signed.frame.sequence,
@@ -2133,6 +2157,36 @@ fn structurally_sound(node: &ShoreshNode) -> bool {
         && (node.hazard <= SEAL_THRESHOLD || node.sanitized)
         && node.ret != BaraType::Unknown
 }
+
+/// Primer código de violación estructural de un nodo, en el orden exacto en que
+/// [`structurally_sound`] las comprueba.
+///
+/// Permite que la caja negra distinga *por qué* se rechazó un nodo: el
+/// diagnóstico se lee en el registro sin volver a inspeccionar el AST.
+fn structural_violation(node: &ShoreshNode) -> ViolationCode {
+    if node.root.is_empty() {
+        return ViolationCode::EmptyRoot;
+    }
+    if !triconsonantal(&node.root) {
+        return ViolationCode::RootNotTriconsonantal;
+    }
+    if node.arity > MAX_ARITY {
+        return ViolationCode::ArityExceeded;
+    }
+    if !in_unit_interval(node.hazard)
+        || !in_unit_interval(node.valence.truth_mass())
+        || !in_unit_interval(node.valence.falsity_mass())
+    {
+        return ViolationCode::MassOutOfRange;
+    }
+    if node.hazard > SEAL_THRESHOLD && !node.sanitized {
+        return ViolationCode::HazardUnsealed;
+    }
+    if node.ret == BaraType::Unknown {
+        return ViolationCode::UnknownType;
+    }
+    ViolationCode::StructuralViolation
+}
 /// Evidencia de pruebas de la periferia: lo único que puede convertir un plan
 /// plausible en un plan fundado.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2364,6 +2418,13 @@ impl BelnapMatrix {
                 node.valence.belnap()
             } else {
                 violations = violations.saturating_add(1);
+                // La causa exacta queda en la caja negra; la huella es la raíz
+                // del nodo, nunca su contenido completo.
+                flight_recorder::record(
+                    EventKind::VerdictRejected,
+                    structural_violation(node),
+                    node.root.as_bytes(),
+                );
                 (0.0, 1.0)
             };
             truth = truth.min(node_truth);
@@ -2394,6 +2455,22 @@ impl BelnapMatrix {
         };
         let (union_truth, union_falsity) = nucleo.united_masses(periferia);
         let union = BelnapValue::from_masses(union_truth, union_falsity);
+
+        // Caja negra: la paradoja no se resuelve, se anota. La huella es la raíz
+        // de Merkle de la rama —no el árbol—: el registro no copia el parche.
+        if periferia.is_contradiction() {
+            flight_recorder::record_digest(
+                EventKind::BelnapConflictBoth,
+                ViolationCode::ContradictionRetained,
+                &ast_dna::merkle_root(&node_digests(branch)),
+            );
+        } else if periferia.is_unknown() {
+            flight_recorder::record_digest(
+                EventKind::BelnapConflictNeither,
+                ViolationCode::IndeterminateVerdict,
+                &ast_dna::merkle_root(&node_digests(branch)),
+            );
+        }
 
         BelnapVerdict {
             periferia,
@@ -3240,10 +3317,44 @@ impl AutopoieticMutator {
     }
 
     /// Registra el rechazo de una propuesta y devuelve el fallo tal cual.
+    ///
+    /// El rechazo queda además en la caja negra: motivo clasificado e
+    /// identificador de la propuesta, nunca su contenido.
     fn refuse(&mut self, proposal_id: u64, error: MutatorError) -> MutatorError {
         self.rejections = self.rejections.saturating_add(1);
         self.log(format!("propuesta #{} rechazada · {}", proposal_id, error));
+        flight_recorder::record_fingerprint(
+            EventKind::VerdictRejected,
+            mutator_violation(&error),
+            proposal_id,
+        );
         error
+    }
+}
+
+/// Clasificación de un fallo de autopoiesis para la caja negra.
+///
+/// Es total: cualquier variante futura obliga a decidir su código, de modo que
+/// el registro nunca hereda un diagnóstico ambiguo.
+fn mutator_violation(error: &MutatorError) -> ViolationCode {
+    match error {
+        MutatorError::Kernel(_) | MutatorError::CellUnknown { .. } => ViolationCode::Unclassified,
+        MutatorError::CellPoisoned { .. } | MutatorError::CellSealed { .. } => {
+            ViolationCode::CellState
+        }
+        MutatorError::CellCapacity { .. } => ViolationCode::CellCapacity,
+        MutatorError::CellEmptyPlan => ViolationCode::EmptyPatch,
+        MutatorError::CellOpBudget { .. } => ViolationCode::BudgetExceeded,
+        MutatorError::NoSuchNode { .. } => ViolationCode::UnknownNode,
+        MutatorError::ArityOverflow { .. } => ViolationCode::ArityExceeded,
+        MutatorError::MassOutOfRange { .. } => ViolationCode::MassOutOfRange,
+        MutatorError::EmptyRoot => ViolationCode::EmptyRoot,
+        MutatorError::ProposalUnknown { .. } => ViolationCode::UnknownProposal,
+        MutatorError::VerdictRejected { .. } => ViolationCode::FusionDenied,
+        MutatorError::AuditFailed { .. } => ViolationCode::AuditFailed,
+        MutatorError::DnaMismatch { .. } => ViolationCode::DnaMismatch,
+        MutatorError::FusionStale { .. } => ViolationCode::StaleCore,
+        MutatorError::CoreBroken => ViolationCode::KernelUnverified,
     }
 }
 impl AutopoieticMutator {
