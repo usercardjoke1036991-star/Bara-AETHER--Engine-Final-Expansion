@@ -44,6 +44,12 @@
 //!   prosa se segmenta en sentencias, se clasifica en un concepto *Shoresh* y
 //!   se colapsa a un veredicto de Belnap; lo hostil o ilegible se sella en
 //!   cuarentena (`רחק`), nunca se ejecuta.
+//! * [`neural_bridge`] — puente neuronal: serializa la cognición del kernel al
+//!   formato de sección del IDE, con censo tetravalente, memoria a largo plazo
+//!   y ciclo autopoiético en un cuerpo JSON determinista.
+//! * [`neural_it`] — NeuralIT: índice semántico de capacidad fija sobre el AST
+//!   *Shoresh*, unión de Belnap sin pánico, blindaje por contrato de propósito
+//!   y auditoría, verificación SHA‑256 y trazas en el Flight Recorder.
 //! * [`ffi`] — frontera `extern "C"` para Android/JNI: estructuras planas
 //!   `#[repr(C)]`, ningún puntero en el ABI y todo fallo como número.
 //!
@@ -87,6 +93,7 @@ pub mod mesh_sync;
 pub mod metal_ir;
 pub mod net_camouflage;
 pub mod neural_bridge;
+pub mod neural_it;
 pub mod quantum_native;
 pub mod repl;
 pub mod runtime;

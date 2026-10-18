@@ -36,6 +36,7 @@ use crate::crypto_native::Sha256;
 use crate::ide_bridge::{BridgeError, Section, SectionKind};
 use crate::inference::InferenceReport;
 use crate::long_term_memory::LongTermMemory;
+use crate::neural_it::{NeuralIt, SemanticView};
 
 /// Dominio de hash del puente neuronal.
 pub const NEURAL_DOMAIN: &[u8] = b"bara:aether-omega:puente-neuronal:v1";
@@ -256,6 +257,8 @@ pub struct NeuralFrame {
     pub memory: Option<MemoryView>,
     /// Último ciclo autopoiético, si se capturó.
     pub cycle: Option<CycleReport>,
+    /// Vista del índice semántico *Shoresh* (NeuralIT), si se capturó.
+    pub semantic: Option<SemanticView>,
 }
 
 impl NeuralFrame {
@@ -267,6 +270,7 @@ impl NeuralFrame {
             census: BelnapCensus::from_report(&report),
             memory: None,
             cycle: None,
+            semantic: None,
         }
     }
 
@@ -293,6 +297,18 @@ impl NeuralFrame {
         self
     }
 
+    /// Añade la vista del índice semántico *Shoresh*.
+    pub fn with_semantic(mut self, engine: &NeuralIt) -> Self {
+        self.semantic = Some(engine.view());
+        self
+    }
+
+    /// Añade una vista semántica ya copiada.
+    pub const fn with_semantic_view(mut self, view: SemanticView) -> Self {
+        self.semantic = Some(view);
+        self
+    }
+
     /// ¿El censo del informe suma sus nodos, el de memoria sus entradas y el
     /// ciclo fusionado está auditado?
     pub fn is_coherent(&self) -> bool {
@@ -308,7 +324,11 @@ impl NeuralFrame {
             }
             None => true,
         };
-        inference_ok && memory_ok && cycle_ok
+        let semantic_ok = match self.semantic {
+            Some(view) => view.is_coherent(),
+            None => true,
+        };
+        inference_ok && memory_ok && cycle_ok && semantic_ok
     }
 
     /// Objeto JSON del informe de inferencia.
@@ -362,6 +382,14 @@ impl NeuralFrame {
         )
     }
 
+    /// Objeto JSON del índice semántico *Shoresh*.
+    fn semantic_json(&self) -> String {
+        match self.semantic {
+            Some(view) => view.json(),
+            None => String::from("null"),
+        }
+    }
+
     /// Objeto neuronal canónico (clave `neuronal` del panel).
     pub fn json(&self) -> String {
         let memory = match self.memory {
@@ -369,13 +397,14 @@ impl NeuralFrame {
             None => String::from("null"),
         };
         format!(
-            "{{\"esquema\":\"{}\",\"generacion\":{},\"inferencia\":{},\"censo\":{},\"memoria\":{},\"ciclo\":{},\"coherente\":{}}}",
+            "{{\"esquema\":\"{}\",\"generacion\":{},\"inferencia\":{},\"censo\":{},\"memoria\":{},\"ciclo\":{},\"semantica\":{},\"coherente\":{}}}",
             NEURAL_SCHEMA,
             self.generation,
             self.report_json(),
             self.census.json(),
             memory,
             self.cycle_json(),
+            self.semantic_json(),
             self.is_coherent()
         )
     }
@@ -488,7 +517,9 @@ fn escape(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::autopoiesis::{CycleVerdict, PurposeViolation};
+    use crate::autopoiesis::{CycleVerdict, PurposeContract, PurposeViolation};
+    use crate::ffi_ingest::{BaraType, ShoreshAst, ShoreshNode};
+    use crate::flight_recorder::FlightRecorder;
     use crate::ide_bridge::{section_identity, Manifest, SectionKind};
     use crate::long_term_memory::MemoryDraft;
 
@@ -536,6 +567,20 @@ mod tests {
         report.audit_total = 9;
         report.verdict = Some(BelnapValue::True);
         report
+    }
+
+    fn semantic_tree() -> ShoreshAst {
+        ShoreshAst {
+            nodes: vec![ShoreshNode {
+                root: "שמר".to_string(),
+                original: "shamar".to_string(),
+                arity: 2,
+                ret: BaraType::Truth,
+                hazard: 0.2,
+                valence: BelnapValue::True.to_state(),
+                sanitized: false,
+            }],
+        }
     }
 
     #[test]
@@ -727,6 +772,44 @@ mod tests {
         assert_ne!(plain.digest(), with_cycle.digest());
         assert!(plain.body().contains("\"ciclo\":null"));
         assert!(with_cycle.body().contains("\"ciclo\":{"));
+    }
+
+    #[test]
+    fn el_marco_expone_la_semantica_neural_it() {
+        let mut engine = NeuralIt::new();
+        let contract = PurposeContract::new("cognicion");
+        let recorder = FlightRecorder::new();
+        assert!(engine
+            .synchronize_with(&semantic_tree(), &contract, Some(&recorder))
+            .is_ok());
+        let frame = frame().with_semantic(&engine);
+        assert!(frame.is_coherent());
+        assert!(frame.body().contains("\"semantica\":{\"ranuras\":1"));
+        assert!(frame.body().contains("\"coherente\":true"));
+        let view = match frame.semantic {
+            Some(view) => view,
+            None => return,
+        };
+        assert_eq!(view.slots, 1);
+        assert_eq!(view.nodes, 1);
+        assert_eq!(view.census, [1, 0, 0, 0]);
+        assert!(view.is_coherent());
+    }
+
+    #[test]
+    fn una_vista_semantica_incoherente_marca_el_marco() {
+        let view = SemanticView {
+            slots: 2,
+            capacity: 1,
+            nodes: 2,
+            census: [2, 0, 0, 0],
+            contradictions: 0,
+            unknown: 0,
+            digest: [0; 32],
+        };
+        let frame = frame().with_semantic_view(view);
+        assert!(!frame.is_coherent());
+        assert!(frame.body().contains("\"coherente\":false"));
     }
 
     #[test]

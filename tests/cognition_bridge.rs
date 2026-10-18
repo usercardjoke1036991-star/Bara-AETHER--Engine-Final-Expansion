@@ -19,13 +19,16 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::all)]
 
-use bara::autopoiesis::{CycleReport, CycleVerdict};
+use bara::autopoiesis::{CycleReport, CycleVerdict, PurposeContract};
 use bara::autopoietic::BelnapValue;
+use bara::ffi_ingest::{BaraType, ShoreshAst, ShoreshNode};
+use bara::flight_recorder::FlightRecorder;
 use bara::inference::InferenceReport;
 use bara::long_term_memory::{LongTermMemory, MemoryDraft};
 use bara::neural_bridge::{
     embed, section_cognition, NeuralFrame, NEURAL_KEY, NEURAL_SCHEMA, NEURAL_SECTION,
 };
+use bara::neural_it::NeuralIt;
 
 fn report() -> InferenceReport {
     InferenceReport {
@@ -71,6 +74,20 @@ fn cycle() -> CycleReport {
     report
 }
 
+fn semantic_tree() -> ShoreshAst {
+    ShoreshAst {
+        nodes: vec![ShoreshNode {
+            root: "שמר".to_string(),
+            original: "shamar".to_string(),
+            arity: 2,
+            ret: BaraType::Truth,
+            hazard: 0.2,
+            valence: BelnapValue::True.to_state(),
+            sanitized: false,
+        }],
+    }
+}
+
 fn frame() -> NeuralFrame {
     NeuralFrame::new(7, report())
         .with_memory(&memory())
@@ -105,6 +122,7 @@ fn el_marco_lleva_inferencia_memoria_y_ciclo() {
     assert!(body.contains("\"memoria\":{\"entradas\":2"));
     assert!(body.contains("\"ciclo\":{\"proposito\":\"orden\""));
     assert!(body.contains("\"resultado\":\"fusionado\""));
+    assert!(body.contains("\"semantica\":null"));
     assert!(body.contains("\"coherente\":true"));
     assert_eq!(body.matches('{').count(), body.matches('}').count());
     assert_eq!(frame.digest(), frame.clone().digest());
@@ -145,4 +163,40 @@ fn incrustar_rechaza_bases_que_no_son_objetos() {
     };
     assert!(empty.starts_with("{\"neuronal\":{"));
     assert!(empty.ends_with('}'));
+}
+
+#[test]
+fn la_sincronizacion_neural_it_viaja_en_el_marco() {
+    let mut engine = NeuralIt::new();
+    let contract = PurposeContract::new("cognicion");
+    let recorder = FlightRecorder::new();
+    let tree = semantic_tree();
+    let sync = match engine.synchronize_with(&tree, &contract, Some(&recorder)) {
+        Ok(sync) => sync,
+        Err(error) => panic!("la sincronización debe pasar la auditoría: {error}"),
+    };
+    assert!(sync.is_coherent());
+    assert!(sync.ticket.is_some());
+    assert_eq!(sync.index.indexed, 1);
+    assert_eq!(sync.index.slots, 1);
+    assert_eq!(sync.purpose, "cognicion");
+    assert!(engine.verify());
+
+    let frame = NeuralFrame::new(7, report()).with_semantic(&engine);
+    assert!(frame.is_coherent());
+    let body = frame.body();
+    assert!(body.contains("\"semantica\":{\"ranuras\":1"));
+    assert!(body.contains("\"nodos\":1"));
+    assert!(body.contains("\"huella\":\""));
+    assert!(body.contains("\"coherente\":true"));
+
+    let slot = match engine.query_with("שמר", Some(&recorder)) {
+        Some(slot) => slot,
+        None => panic!("la raíz indexada debe consultarse"),
+    };
+    assert_eq!(slot.value, BelnapValue::True);
+    assert_eq!(slot.nodes, 1);
+    assert_eq!(slot.hazard_permille, 200);
+    assert!(engine.query_with("no-existe", Some(&recorder)).is_none());
+    assert_eq!(engine.census(), [1, 0, 0, 0]);
 }

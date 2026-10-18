@@ -107,15 +107,18 @@ pub enum EventKind {
     BelnapConflictBoth = 3,
     /// `∅` · colisión de Belnap: ni verdad ni falsedad (información insuficiente).
     BelnapConflictNeither = 4,
+    /// `⟳` · sincronización o consulta cognitiva verificada por huella.
+    CognitiveSync = 5,
 }
 
 impl EventKind {
-    /// Las cuatro clases en orden canónico.
-    pub const ALL: [EventKind; 4] = [
+    /// Las cinco clases en orden canónico.
+    pub const ALL: [EventKind; 5] = [
         EventKind::PerimeterAlert,
         EventKind::VerdictRejected,
         EventKind::BelnapConflictBoth,
         EventKind::BelnapConflictNeither,
+        EventKind::CognitiveSync,
     ];
 
     /// Código estable de la clase.
@@ -131,6 +134,7 @@ impl EventKind {
             2 => Some(EventKind::VerdictRejected),
             3 => Some(EventKind::BelnapConflictBoth),
             4 => Some(EventKind::BelnapConflictNeither),
+            5 => Some(EventKind::CognitiveSync),
             _ => None,
         }
     }
@@ -142,6 +146,7 @@ impl EventKind {
             EventKind::VerdictRejected => "veredicto rechazado",
             EventKind::BelnapConflictBoth => "conflicto de Belnap ⊤∧⊥",
             EventKind::BelnapConflictNeither => "conflicto de Belnap ∅",
+            EventKind::CognitiveSync => "sincronización cognitiva",
         }
     }
 
@@ -152,6 +157,7 @@ impl EventKind {
             EventKind::VerdictRejected => "⊘",
             EventKind::BelnapConflictBoth => "⊤∧⊥",
             EventKind::BelnapConflictNeither => "∅",
+            EventKind::CognitiveSync => "⟳",
         }
     }
 }
@@ -1051,7 +1057,7 @@ mod pruebas {
             assert!(!event.glyph().is_empty());
         }
         assert_eq!(EventKind::from_code(0), None);
-        assert_eq!(EventKind::from_code(5), None);
+        assert_eq!(EventKind::from_code(6), None);
         for code in ViolationCode::ALL {
             assert_eq!(
                 ViolationCode::from_code(code.code()),
