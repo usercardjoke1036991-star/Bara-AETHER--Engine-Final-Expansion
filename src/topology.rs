@@ -1002,6 +1002,175 @@ pub fn descend_hierarchy(block: Contracted) -> Contracted {
     Spine::assemble().descend(block)
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Espacio métrico del AST
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Nodos que entran en una carta. El resto se cuenta y no se mide.
+pub const CHART_CAP: usize = 32;
+
+/// Tope de la distancia topológica. Ningún par supera este valor.
+pub const METRIC_CAP: u32 = 64;
+
+/// Bytes de raíz que entran en el punto. El corte respeta fronteras UTF-8.
+const ROOT_BYTES: usize = 16;
+
+/// Punto del AST en el espacio discreto: índice, residuo de `𝔽ₚ` y raíz acotada.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MetricPoint {
+    /// Posición en el documento, acotada por [`CHART_CAP`].
+    pub index: u16,
+    /// Residuo del polinomio del nodo, o pliegue de la raíz si no hay nodo.
+    pub residue: u64,
+    /// Aridad cuantizada.
+    pub arity: u16,
+    root: [u8; ROOT_BYTES],
+    root_len: u8,
+}
+
+impl MetricPoint {
+    /// Raíz empaquetada. Vacía si el corte no llegó a formar texto.
+    pub fn root(&self) -> &str {
+        let end = usize::from(self.root_len);
+        self.root
+            .get(..end)
+            .and_then(|bytes| core::str::from_utf8(bytes).ok())
+            .unwrap_or("")
+    }
+}
+
+/// Carta métrica de un AST: como máximo [`CHART_CAP`] puntos, en orden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AstChart {
+    points: [MetricPoint; CHART_CAP],
+    len: u16,
+    spilled: u16,
+}
+
+impl AstChart {
+    /// Carta vacía.
+    pub const fn empty() -> Self {
+        Self {
+            points: [MetricPoint {
+                index: 0,
+                residue: 0,
+                arity: 0,
+                root: [0; ROOT_BYTES],
+                root_len: 0,
+            }; CHART_CAP],
+            len: 0,
+            spilled: 0,
+        }
+    }
+
+    /// Puntos vivos, en orden de documento.
+    pub fn points(&self) -> &[MetricPoint] {
+        let end = usize::from(self.len).min(CHART_CAP);
+        self.points.get(..end).unwrap_or(&[])
+    }
+
+    /// Cuántos puntos entraron.
+    pub fn len(&self) -> u16 {
+        self.len
+    }
+
+    /// ¿La carta no midió ningún punto?
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Nodos que no cupieron.
+    pub fn spilled(&self) -> u16 {
+        self.spilled
+    }
+
+    /// Pares con el mismo residuo de `𝔽ₚ` en posiciones distintas.
+    pub fn overlaps(&self) -> u16 {
+        let mut count = 0u16;
+        let points = self.points();
+        for (index, left) in points.iter().enumerate() {
+            let rest = points.get(index.saturating_add(1)..).unwrap_or(&[]);
+            for right in rest {
+                if left.residue == right.residue {
+                    count = count.saturating_add(1);
+                }
+            }
+        }
+        count
+    }
+
+    /// Carta de nodos *Shoresh*. El residuo es la identidad polinómica.
+    pub fn from_nodes(nodes: &[ShoreshNode]) -> Self {
+        let mut chart = Self::empty();
+        for node in nodes {
+            if !chart.push(node_point(chart.len, node)) {
+                chart.spilled = chart.spilled.saturating_add(1);
+            }
+        }
+        chart
+    }
+
+    /// Carta de raíces sueltas. El residuo es el pliegue `φ` de cada una.
+    pub fn from_roots(roots: &[&str]) -> Self {
+        let mut chart = Self::empty();
+        for root in roots {
+            if !chart.push(root_point(chart.len, root)) {
+                chart.spilled = chart.spilled.saturating_add(1);
+            }
+        }
+        chart
+    }
+
+    fn push(&mut self, point: MetricPoint) -> bool {
+        let Some(slot) = self.points.get_mut(usize::from(self.len)) else {
+            return false;
+        };
+        *slot = point;
+        self.len = self.len.saturating_add(1);
+        true
+    }
+}
+
+fn pack_root(root: &str) -> ([u8; ROOT_BYTES], u8) {
+    let mut bytes = [0u8; ROOT_BYTES];
+    let mut len = 0usize;
+    for ch in root.chars() {
+        let mut buf = [0u8; 4];
+        let encoded = ch.encode_utf8(&mut buf);
+        let next = len.saturating_add(encoded.len());
+        if next > ROOT_BYTES {
+            break;
+        }
+        if let Some(slot) = bytes.get_mut(len..next) {
+            slot.copy_from_slice(encoded.as_bytes());
+            len = next;
+        }
+    }
+    (bytes, u8::try_from(len).unwrap_or(0))
+}
+
+fn node_point(index: u16, node: &ShoreshNode) -> MetricPoint {
+    let (root, root_len) = pack_root(&node.root);
+    MetricPoint {
+        index,
+        residue: ast_dna::node_identity(node).0,
+        arity: u16::try_from(node.arity).unwrap_or(u16::MAX),
+        root,
+        root_len,
+    }
+}
+
+fn root_point(index: u16, root: &str) -> MetricPoint {
+    let (packed, root_len) = pack_root(root);
+    MetricPoint {
+        index,
+        residue: ast_dna::root_fold(root),
+        arity: 0,
+        root: packed,
+        root_len,
+    }
+}
+
 #[cfg(test)]
 mod pruebas {
     use super::*;

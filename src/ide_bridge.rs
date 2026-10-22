@@ -45,7 +45,7 @@
 
 use std::fmt;
 
-use crate::ast_dna::short_hex;
+use crate::ast_dna::{embed_root, short_hex};
 use crate::crypto_native::sha256;
 use crate::immune::ImmuneSystem;
 use crate::immunity_gateway::{Bubble, Gateway};
@@ -1003,6 +1003,38 @@ pub fn section_kernel(core: &BaraRuntime) -> Result<Section, BridgeError> {
     body.push_str(&core.mutator.generation().to_string());
     body.push_str(",\"total\":");
     body.push_str(&core.mutator.axioms().count().to_string());
+    body.push_str("},\"evolucion\":{\"avistamientos\":");
+    body.push_str(&core.mutator.sightings_total().to_string());
+    body.push_str(",\"ledger\":");
+    body.push_str(&core.mutator.ledger_len().to_string());
+    body.push_str(",\"ultimo\":");
+    body.push_str(&json_opt_str(core.mutator.ledger_last_root()));
+    body.push_str("},\"atencion\":{\"total\":");
+    body.push_str(&core.mutator.attention_total().to_string());
+    body.push_str(",\"cumbre\":");
+    body.push_str(&core.mutator.attention_peak().to_string());
+    body.push_str(",\"prioridad\":");
+    let focus = core.mutator.priority_root().unwrap_or("").to_string();
+    body.push_str(&json_opt_str(if focus.is_empty() {
+        None
+    } else {
+        Some(focus.as_str())
+    }));
+    let symbol = embed_root(&focus);
+    body.push_str("},\"simbolo\":{\"lanes\":");
+    body.push_str(&symbol.json());
+    body.push_str("},\"correccion\":{\"rastros\":");
+    body.push_str(&core.timeline.resolution_len().to_string());
+    body.push_str(",\"sello\":");
+    body.push_str(&core.correction.seal_total().to_string());
+    body.push_str(",\"separacion\":");
+    body.push_str(&core.correction.split_total().to_string());
+    body.push_str(",\"anticipa\":");
+    let anticipated = core
+        .correction
+        .anticipate(&focus)
+        .map(crate::inference::ResolutionTactic::label);
+    body.push_str(&json_opt_str(anticipated));
     body.push_str("},\"regiones\":");
     body.push_str(&core.regions.len().to_string());
     body.push_str(",\"tiempo\":{\"instantaneas\":");

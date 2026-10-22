@@ -83,6 +83,8 @@ pub enum SourceLanguage {
     CSharp,
     /// C / C++.
     C,
+    /// Solidity.
+    Solidity,
     /// SQL.
     Sql,
     /// *Shell* POSIX.
@@ -102,6 +104,7 @@ impl SourceLanguage {
             SourceLanguage::Java => "java",
             SourceLanguage::CSharp => "cs",
             SourceLanguage::C => "c",
+            SourceLanguage::Solidity => "sol",
             SourceLanguage::Sql => "sql",
             SourceLanguage::Shell => "sh",
             SourceLanguage::Unknown => "?",
@@ -118,6 +121,7 @@ impl SourceLanguage {
             SourceLanguage::Java => "Java",
             SourceLanguage::CSharp => "C#",
             SourceLanguage::C => "C/C++",
+            SourceLanguage::Solidity => "Solidity",
             SourceLanguage::Sql => "SQL",
             SourceLanguage::Shell => "shell",
             SourceLanguage::Unknown => "desconocido",
@@ -151,6 +155,9 @@ pub fn detect_language(fragment: &str) -> SourceLanguage {
     }
     if text.contains("#include") || text.contains("int main(") {
         return SourceLanguage::C;
+    }
+    if text.contains("pragma solidity") || text.contains("contract ") {
+        return SourceLanguage::Solidity;
     }
     if text.contains("public class") || text.contains("system.out") {
         return SourceLanguage::Java;
@@ -482,7 +489,16 @@ impl Accumulator {
 pub fn transmute(fragment: &str) -> Transmutation {
     let language = detect_language(fragment);
     let (bounded, truncated) = bounded_prefix(fragment, MAX_FRAGMENT_BYTES);
-    analyze(language, bounded, truncated, false)
+    analyze(language, bounded, truncated, false, false)
+}
+
+/// Transmuta una ventana ya recortada por el lector de lotes.
+///
+/// No aplica el tope de 64 KiB ni el de 256 sentencias: quien llama parte el
+/// archivo. El fragmento suelto sigue usando [`transmute`], que conserva esos
+/// topes.
+pub fn transmute_stream(fragment: &str, language: SourceLanguage) -> Transmutation {
+    analyze(language, fragment, false, false, true)
 }
 
 /// Núcleo compartido por [`transmute`] y [`transmute_bytes`].
@@ -496,13 +512,18 @@ fn analyze(
     fragment: &str,
     truncated: bool,
     lossy: bool,
+    batch: bool,
 ) -> Transmutation {
     let mut statements = match segment(fragment) {
         Ok(statements) => statements,
         Err(_) => return quarantine_only(language, truncated, lossy, "fragmento ilegible"),
     };
-    let truncated = truncated || statements.len() > MAX_STATEMENTS;
-    if truncated {
+    let truncated = if batch {
+        truncated
+    } else {
+        truncated || statements.len() > MAX_STATEMENTS
+    };
+    if !batch && statements.len() > MAX_STATEMENTS {
         statements.truncate(MAX_STATEMENTS);
     }
 
@@ -614,7 +635,7 @@ pub fn transmute_bytes(fragment: &[u8]) -> Transmutation {
     };
     let lossy = std::str::from_utf8(slice).is_err();
     let text = String::from_utf8_lossy(slice);
-    analyze(detect_language(&text), &text, truncated, lossy)
+    analyze(detect_language(&text), &text, truncated, lossy, false)
 }
 
 /// AST de cuarentena: un único nodo `רחק` sellado con `⊥`.
@@ -1027,6 +1048,8 @@ fn classify(statement: &str) -> Concept {
         "fn" | "def"
             | "func"
             | "function"
+            | "contract"
+            | "pragma"
             | "class"
             | "struct"
             | "impl"

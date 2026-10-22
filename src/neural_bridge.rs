@@ -29,12 +29,13 @@
 
 use std::fmt;
 
-use crate::ast_dna::short_hex;
+use crate::ast_dna::{embed_root, short_hex, SymbolicEmbedding};
 use crate::autopoiesis::CycleReport;
 use crate::autopoietic::BelnapValue;
 use crate::crypto_native::Sha256;
 use crate::ide_bridge::{BridgeError, Section, SectionKind};
-use crate::inference::InferenceReport;
+use crate::inference::{InferenceReport, ResolutionAdvice, RootKey};
+use crate::topology::{AstChart, MetricPoint, METRIC_CAP};
 use crate::long_term_memory::LongTermMemory;
 use crate::neural_it::{NeuralIt, SemanticView};
 
@@ -259,6 +260,12 @@ pub struct NeuralFrame {
     pub cycle: Option<CycleReport>,
     /// Vista del índice semántico *Shoresh* (NeuralIT), si se capturó.
     pub semantic: Option<SemanticView>,
+    /// Consejos para estados `Both`, como máximo cuatro.
+    pub advice: [Option<ResolutionAdvice>; 4],
+    /// Embedding del fragmento que el marco está mirando. Cero si no hay nodo.
+    pub embedding: SymbolicEmbedding,
+    /// Carta topológica del AST que el marco está mirando.
+    pub topology: TopoView,
 }
 
 impl NeuralFrame {
@@ -271,7 +278,32 @@ impl NeuralFrame {
             memory: None,
             cycle: None,
             semantic: None,
+            advice: [None; 4],
+            embedding: SymbolicEmbedding::zero(),
+            topology: TopoView::quiet(),
         }
+    }
+
+    /// Fija la carta topológica del fragmento activo.
+    pub const fn with_topology(mut self, topology: TopoView) -> Self {
+        self.topology = topology;
+        self
+    }
+
+    /// Fija el embedding del fragmento activo.
+    pub const fn with_embedding(mut self, embedding: SymbolicEmbedding) -> Self {
+        self.embedding = embedding;
+        self
+    }
+
+    /// Copia hasta cuatro consejos de resolución. El resto se descarta.
+    pub fn with_advice(mut self, advice: &[ResolutionAdvice]) -> Self {
+        for (index, item) in advice.iter().take(self.advice.len()).enumerate() {
+            if let Some(slot) = self.advice.get_mut(index) {
+                *slot = Some(*item);
+            }
+        }
+        self
     }
 
     /// Marco con memoria.
@@ -397,7 +429,7 @@ impl NeuralFrame {
             None => String::from("null"),
         };
         format!(
-            "{{\"esquema\":\"{}\",\"generacion\":{},\"inferencia\":{},\"censo\":{},\"memoria\":{},\"ciclo\":{},\"semantica\":{},\"coherente\":{}}}",
+            "{{\"esquema\":\"{}\",\"generacion\":{},\"inferencia\":{},\"censo\":{},\"memoria\":{},\"ciclo\":{},\"semantica\":{},\"recomendaciones\":{},\"embedding\":{},\"proximidad_mili\":{},\"topologia\":{},\"coherente\":{}}}",
             NEURAL_SCHEMA,
             self.generation,
             self.report_json(),
@@ -405,8 +437,36 @@ impl NeuralFrame {
             memory,
             self.cycle_json(),
             self.semantic_json(),
+            self.advice_json(),
+            self.embedding.json(),
+            conceptual_milli(self.embedding, embed_root("ברא")),
+            self.topology.json(),
             self.is_coherent()
         )
+    }
+
+    /// Lista JSON de consejos `Both`. Vacía si la evaluación no encontró ninguno.
+    fn advice_json(&self) -> String {
+        let mut out = String::from("[");
+        let mut first = true;
+        for slot in &self.advice {
+            let Some(advice) = slot else {
+                continue;
+            };
+            if !first {
+                out.push(',');
+            }
+            first = false;
+            out.push_str("{\"raiz\":\"");
+            out.push_str(&escape(advice.root.as_str()));
+            out.push_str("\",\"tactica\":\"");
+            out.push_str(advice.tactic.label());
+            out.push_str("\",\"recomendacion\":\"");
+            out.push_str(&escape(advice.tactic.recommendation()));
+            out.push_str("\"}");
+        }
+        out.push(']');
+        out
     }
 
     /// Cuerpo completo de la sección: `{"neuronal":{…}}`.
@@ -452,6 +512,214 @@ impl fmt::Display for NeuralFrame {
             self.fingerprint()
         )
     }
+}
+
+/// Coseno en milésimas `[-1000, 1000]`. Un vector nulo mide cero.
+pub fn conceptual_milli(left: SymbolicEmbedding, right: SymbolicEmbedding) -> i32 {
+    let mut dot: i64 = 0;
+    let mut left_norm: i64 = 0;
+    let mut right_norm: i64 = 0;
+    for (left_lane, right_lane) in left.lanes.iter().zip(right.lanes.iter()) {
+        let l = i64::from(*left_lane);
+        let r = i64::from(*right_lane);
+        dot += l * r;
+        left_norm += l * l;
+        right_norm += r * r;
+    }
+    if dot == 0 || left_norm == 0 || right_norm == 0 {
+        return 0;
+    }
+    let denom = ((left_norm as f64) * (right_norm as f64)).sqrt();
+    if denom == 0.0 {
+        return 0;
+    }
+    let milli = (dot as f64) * 1000.0 / denom;
+    let quantized = milli.round().clamp(-1000.0, 1000.0);
+    if quantized >= 0.0 {
+        quantized as i32
+    } else {
+        -((-quantized) as i32)
+    }
+}
+
+/// Similitud coseno en `[-1, 1]`, cuantizada a milésimas para que el bit no flote.
+pub fn conceptual_cosine(left: SymbolicEmbedding, right: SymbolicEmbedding) -> f32 {
+    (conceptual_milli(left, right) as f32) / 1000.0
+}
+
+/// Vista topológica copiable: conteos, el par más cercano y la alerta de solape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TopoView {
+    /// Puntos que entraron en la carta.
+    pub nodes: u16,
+    /// Pares con el mismo residuo.
+    pub overlaps: u16,
+    /// Cohesión en milésimas. `1000` es un documento de un solo punto.
+    pub cohesion_milli: u16,
+    /// Distancia del par más cercano. `u16::MAX` si no hay par.
+    pub nearest: u16,
+    /// Nodos que no cupieron en la carta.
+    pub omitted: u16,
+    /// Raíz de un extremo del par más cercano.
+    pub focus: RootKey,
+    /// Raíz del otro extremo.
+    pub neighbor: RootKey,
+    /// Hay al menos un solape de trayectoria.
+    pub alert: bool,
+}
+
+impl TopoView {
+    /// Carta vacía, cohesión plena y sin alerta.
+    pub const fn quiet() -> Self {
+        Self {
+            nodes: 0,
+            overlaps: 0,
+            cohesion_milli: 1000,
+            nearest: u16::MAX,
+            omitted: 0,
+            focus: RootKey::empty(),
+            neighbor: RootKey::empty(),
+            alert: false,
+        }
+    }
+
+    /// Objeto JSON en *snake_case*.
+    pub fn json(&self) -> String {
+        let distance = if self.nearest == u16::MAX {
+            String::from("null")
+        } else {
+            self.nearest.to_string()
+        };
+        format!(
+            "{{\"nodos\":{},\"solapes\":{},\"cohesion_mili\":{},\"distancia\":{},\"omitidos\":{},\"foco\":\"{}\",\"vecino\":\"{}\",\"alerta\":{}}}",
+            self.nodes,
+            self.overlaps,
+            self.cohesion_milli,
+            distance,
+            self.omitted,
+            escape(self.focus.as_str()),
+            escape(self.neighbor.as_str()),
+            self.alert
+        )
+    }
+}
+
+/// Distancia de edición de raíces, acotada a 16 bytes.
+///
+/// El recorte es por bytes ya empaquetados en el punto, así que no parte un
+/// carácter: [`MetricPoint::root`] sólo publica texto válido.
+#[allow(clippy::needless_range_loop)]
+pub fn root_edit_distance(left: &str, right: &str) -> u32 {
+    let left_bytes = left.as_bytes();
+    let right_bytes = right.as_bytes();
+    let rows = left_bytes.len().min(16);
+    let cols = right_bytes.len().min(16);
+    let mut prev = [0u16; 17];
+    let mut curr = [0u16; 17];
+    for column in 0..=cols {
+        if let Some(slot) = prev.get_mut(column) {
+            *slot = u16::try_from(column).unwrap_or(0);
+        }
+    }
+    for row in 1..=rows {
+        if let Some(slot) = curr.get_mut(0) {
+            *slot = u16::try_from(row).unwrap_or(0);
+        }
+        for column in 1..=cols {
+            let left_byte = left_bytes.get(row.saturating_sub(1)).copied().unwrap_or(0);
+            let right_byte = right_bytes.get(column.saturating_sub(1)).copied().unwrap_or(0);
+            let cost = u16::from(left_byte != right_byte);
+            let deletion = prev.get(column).copied().unwrap_or(0).saturating_add(1);
+            let insertion = curr
+                .get(column.saturating_sub(1))
+                .copied()
+                .unwrap_or(0)
+                .saturating_add(1);
+            let substitution = prev
+                .get(column.saturating_sub(1))
+                .copied()
+                .unwrap_or(0)
+                .saturating_add(cost);
+            if let Some(slot) = curr.get_mut(column) {
+                *slot = deletion.min(insertion).min(substitution);
+            }
+        }
+        prev = curr;
+    }
+    u32::from(prev.get(cols).copied().unwrap_or(0))
+}
+
+/// Distancia topológica: saltos en el documento, edición de la raíz y aridad.
+///
+/// El resultado queda en `0..=METRIC_CAP`. El mismo par, en cualquier orden de
+/// llamada, devuelve el mismo entero.
+pub fn topological_distance(left: &MetricPoint, right: &MetricPoint) -> u32 {
+    let hops = u32::from(left.index.abs_diff(right.index));
+    let edit = root_edit_distance(left.root(), right.root());
+    let arity = u32::from(left.arity.abs_diff(right.arity));
+    hops.saturating_add(edit)
+        .saturating_add(arity)
+        .min(METRIC_CAP)
+}
+
+/// Carta de nodos y su vista para el cockpit.
+pub fn survey(nodes: &[crate::ffi_ingest::ShoreshNode]) -> TopoView {
+    view_of(&AstChart::from_nodes(nodes))
+}
+
+/// Carta de raíces sueltas, en el orden recibido.
+pub fn survey_roots(roots: &[&str]) -> TopoView {
+    view_of(&AstChart::from_roots(roots))
+}
+
+fn view_of(chart: &AstChart) -> TopoView {
+    let points = chart.points();
+    let mut total = 0u32;
+    let mut pairs = 0u32;
+    let mut nearest = u32::from(u16::MAX);
+    let mut focus = RootKey::empty();
+    let mut neighbor = RootKey::empty();
+    for (index, left) in points.iter().enumerate() {
+        let Some(rest) = points.get(index.saturating_add(1)..) else {
+            continue;
+        };
+        for right in rest {
+            let distance = topological_distance(left, right);
+            pairs = pairs.saturating_add(1);
+            total = total.saturating_add(distance);
+            if distance < nearest {
+                nearest = distance;
+                focus = RootKey::new(left.root()).unwrap_or_else(RootKey::empty);
+                neighbor = RootKey::new(right.root()).unwrap_or_else(RootKey::empty);
+            }
+        }
+    }
+    let cohesion_milli = if pairs == 0 {
+        1000u32
+    } else {
+        let mean = total.checked_div(pairs).unwrap_or(0);
+        1000u32.saturating_sub(mean.saturating_mul(1000) / METRIC_CAP)
+    };
+    TopoView {
+        nodes: chart.len(),
+        overlaps: chart.overlaps(),
+        cohesion_milli: u16::try_from(cohesion_milli).unwrap_or(1000),
+        nearest: u16::try_from(nearest).unwrap_or(u16::MAX),
+        omitted: chart.spilled(),
+        focus,
+        neighbor,
+        alert: chart.overlaps() > 0,
+    }
+}
+
+/// Distancia euclídea de los carriles en punto fijo. Cero si los vectores coinciden.
+pub fn conceptual_euclidean(left: SymbolicEmbedding, right: SymbolicEmbedding) -> f32 {
+    let mut acc: i64 = 0;
+    for (left_lane, right_lane) in left.lanes.iter().zip(right.lanes.iter()) {
+        let delta = i64::from(*left_lane) - i64::from(*right_lane);
+        acc += delta * delta;
+    }
+    (acc as f32).sqrt()
 }
 
 /// Sección `nucleo` con la cognición de un marco.

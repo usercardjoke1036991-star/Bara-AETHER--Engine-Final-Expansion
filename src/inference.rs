@@ -261,6 +261,141 @@ pub struct InferenceStep {
     pub after: BelnapValue,
 }
 
+/// Qué hacer con un `Both` antes de dejarlo colapsar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolutionTactic {
+    /// El hecho ya nació contradictorio: sellar la falsedad.
+    Seal,
+    /// La contradicción la produjo una unión: separar los antecedentes.
+    Split,
+}
+
+impl ResolutionTactic {
+    /// Nombre estable para el JSON del cockpit.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Seal => "sellar",
+            Self::Split => "separar",
+        }
+    }
+
+    /// Recomendación paraconsistente, sin umbrales ajenos al núcleo.
+    pub const fn recommendation(self) -> &'static str {
+        match self {
+            Self::Seal => "el hecho ya es ⊤∧⊥: aplicar שמר sella ⊥ antes de propagarlo",
+            Self::Split => {
+                "la unión derivó ⊤∧⊥: evaluar los antecedentes por separado antes del colapso"
+            }
+        }
+    }
+}
+
+/// Consejo acotado para un nodo en `Both`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolutionAdvice {
+    /// Raíz del nodo contradictorio.
+    pub root: RootKey,
+    /// Táctica determinista.
+    pub tactic: ResolutionTactic,
+}
+
+/// Tope de consejos que se publican por evaluación.
+pub const MAX_ADVICE: usize = 8;
+
+/// Ranuras del optimizador simbólico. El exceso de raíces se ignora.
+pub const PRIOR_SLOTS: usize = 16;
+
+/// Repeticiones iguales que convierten un rastro en anticipación.
+pub const CONSISTENT_REPETITIONS: u16 = 2;
+
+/// Peso acumulado de una raíz a partir de resoluciones ya vistas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SymbolicPrior {
+    /// Raíz o patrón (`B*F`, una raíz corta, …).
+    pub root: RootKey,
+    /// Veces que la resolución fue un sello (`שמר`).
+    pub seal: u16,
+    /// Veces que la resolución fue una separación.
+    pub split: u16,
+}
+
+/// Optimizador de reglas. No usa gradientes: cuenta sellos y separaciones.
+///
+/// Dos resoluciones iguales y estrictamente mayoritarias anticipan la
+/// siguiente. Por debajo de ese umbral el motor sigue la estructura del nodo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RuleOptimizer {
+    slots: [Option<SymbolicPrior>; PRIOR_SLOTS],
+}
+
+impl Default for RuleOptimizer {
+    fn default() -> Self {
+        Self {
+            slots: [None; PRIOR_SLOTS],
+        }
+    }
+}
+
+impl RuleOptimizer {
+    /// Optimizador sin historia.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Suma una resolución. Una raíz que no cabe en [`RootKey`] se ignora.
+    pub fn absorb(&mut self, root: &str, seal: bool) {
+        let Some(key) = RootKey::new(root) else {
+            return;
+        };
+        if let Some(slot) = self.slots.iter_mut().flatten().find(|prior| prior.root == key) {
+            if seal {
+                slot.seal = slot.seal.saturating_add(1);
+            } else {
+                slot.split = slot.split.saturating_add(1);
+            }
+            return;
+        }
+        if let Some(empty) = self.slots.iter_mut().find(|slot| slot.is_none()) {
+            *empty = Some(SymbolicPrior {
+                root: key,
+                seal: u16::from(seal),
+                split: u16::from(!seal),
+            });
+        }
+    }
+
+    /// Táctica anticipada, si el rastro ya es consistente.
+    pub fn anticipate(&self, root: &str) -> Option<ResolutionTactic> {
+        let key = RootKey::new(root)?;
+        let prior = self.slots.iter().flatten().find(|prior| prior.root == key)?;
+        if prior.seal >= CONSISTENT_REPETITIONS && prior.seal > prior.split {
+            Some(ResolutionTactic::Seal)
+        } else if prior.split >= CONSISTENT_REPETITIONS && prior.split > prior.seal {
+            Some(ResolutionTactic::Split)
+        } else {
+            None
+        }
+    }
+
+    /// Suma de sellos registrados.
+    pub fn seal_total(&self) -> u32 {
+        self.slots
+            .iter()
+            .flatten()
+            .map(|prior| u32::from(prior.seal))
+            .fold(0, u32::saturating_add)
+    }
+
+    /// Suma de separaciones registradas.
+    pub fn split_total(&self) -> u32 {
+        self.slots
+            .iter()
+            .flatten()
+            .map(|prior| u32::from(prior.split))
+            .fold(0, u32::saturating_add)
+    }
+}
+
 /// Foto coherente de una evaluación.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InferenceReport {
@@ -420,6 +555,10 @@ pub struct InferenceEngine {
     rule_len: usize,
     trace_len: usize,
     evaluated: bool,
+    /// Historia de resoluciones que sesga el consejo, no el valor de Belnap.
+    priors: RuleOptimizer,
+    /// Solapes topológicos ya elevados a `Both`. Cero deja el consejo estructural.
+    overlap_marks: u16,
 }
 
 impl InferenceEngine {
@@ -439,7 +578,103 @@ impl InferenceEngine {
             rule_len: 0,
             trace_len: 0,
             evaluated: false,
+            priors: RuleOptimizer::new(),
+            overlap_marks: 0,
         }
+    }
+
+    /// Eleva una raíz a `Both` porque su trayectoria se solapa en el AST.
+    ///
+    /// No evalúa de nuevo y no borra el hecho asertado: une el valor vivo con
+    /// `⊤∧⊥`. Una raíz que no está en el motor devuelve `false`.
+    pub fn raise_overlap(&mut self, root: &str) -> bool {
+        let Some(key) = RootKey::new(root) else {
+            return false;
+        };
+        let Some(node) = self
+            .nodes
+            .iter_mut()
+            .take(self.node_len)
+            .find(|node| node.root == key)
+        else {
+            return false;
+        };
+        if node.value != BelnapValue::Both {
+            node.value = node.value.union(BelnapValue::Both);
+            node.is_derived = node.value != node.asserted;
+        }
+        self.overlap_marks = self.overlap_marks.saturating_add(1);
+        true
+    }
+
+    /// Cuántos solapes se elevaron en esta sesión del motor.
+    pub fn overlap_marks(&self) -> u16 {
+        self.overlap_marks
+    }
+
+    /// Consejo leído del vecindario de reglas, no de un gradiente.
+    ///
+    /// Vecinos en `⊤` y en `⊥` a la vez piden separar. Una mayoría `⊤` pide
+    /// sellar. Sin vecinos no hay consejo topológico.
+    pub fn neighborhood_tactic(&self, root: &str) -> Option<ResolutionTactic> {
+        let key = RootKey::new(root)?;
+        let focus = self
+            .nodes
+            .iter()
+            .take(self.node_len)
+            .position(|node| node.root == key)?;
+        let mut truths = 0u16;
+        let mut falsehoods = 0u16;
+        for rule in self.rules.iter().take(self.rule_len) {
+            let touches = rule.from.index() == focus
+                || rule.to.index() == focus
+                || rule.aux.is_some_and(|id| id.index() == focus);
+            if !touches {
+                continue;
+            }
+            let adjacent = [Some(rule.from), Some(rule.to), rule.aux];
+            for candidate in adjacent.into_iter().flatten() {
+                if candidate.index() == focus {
+                    continue;
+                }
+                let Some(neighbor) = self.node(candidate) else {
+                    continue;
+                };
+                match neighbor.value {
+                    BelnapValue::True => truths = truths.saturating_add(1),
+                    BelnapValue::False => falsehoods = falsehoods.saturating_add(1),
+                    BelnapValue::Both => {
+                        truths = truths.saturating_add(1);
+                        falsehoods = falsehoods.saturating_add(1);
+                    }
+                    BelnapValue::Neither => {}
+                }
+            }
+        }
+        if truths > 0 && falsehoods > 0 {
+            Some(ResolutionTactic::Split)
+        } else if truths > falsehoods {
+            Some(ResolutionTactic::Seal)
+        } else if falsehoods > truths {
+            Some(ResolutionTactic::Split)
+        } else {
+            None
+        }
+    }
+
+    /// Incorpora una resolución ya confirmada al optimizador de este motor.
+    pub fn absorb(&mut self, root: &str, seal: bool) {
+        self.priors.absorb(root, seal);
+    }
+
+    /// Táctica que la historia ya repitió para esta raíz.
+    pub fn anticipate(&self, root: &str) -> Option<ResolutionTactic> {
+        self.priors.anticipate(root)
+    }
+
+    /// Optimizador de sólo lectura.
+    pub fn optimizer(&self) -> &RuleOptimizer {
+        &self.priors
     }
 
     /// Nodos declarados.
@@ -737,6 +972,44 @@ impl InferenceEngine {
         }
     }
 
+    /// Consejos para cada `Both` vivo, antes de un colapso.
+    ///
+    /// Un hecho que ya es `⊤∧⊥` se sella. Uno que llegó a `⊤∧⊥` por derivación
+    /// se separa. El orden es el de los nodos y el corte es [`MAX_ADVICE`].
+    /// El arreglo vive en la pila: esta lectura no asigna.
+    pub fn resolutions(&self) -> [Option<ResolutionAdvice>; MAX_ADVICE] {
+        let mut advice = [None; MAX_ADVICE];
+        let mut written = 0usize;
+        for node in self.nodes() {
+            if node.value != BelnapValue::Both {
+                continue;
+            }
+            if written >= MAX_ADVICE {
+                break;
+            }
+            let structural = if node.is_fact && !node.is_derived {
+                ResolutionTactic::Seal
+            } else {
+                ResolutionTactic::Split
+            };
+            let tactic = if self.overlap_marks > 0 {
+                self.neighborhood_tactic(node.root.as_str())
+                    .or_else(|| self.anticipate(node.root.as_str()))
+                    .unwrap_or(structural)
+            } else {
+                self.anticipate(node.root.as_str()).unwrap_or(structural)
+            };
+            if let Some(slot) = advice.get_mut(written) {
+                *slot = Some(ResolutionAdvice {
+                    root: node.root,
+                    tactic,
+                });
+                written = written.saturating_add(1);
+            }
+        }
+        advice
+    }
+
     /// Censo en el orden `[⊤, ⊥, ⊤∧⊥, ∅]`.
     pub fn census(&self) -> [usize; 4] {
         let report = self.report(0, 0);
@@ -794,6 +1067,77 @@ mod tests {
         assert!(engine.nodes().is_empty());
         assert!(engine.rules().is_empty());
         assert!(engine.trace().is_empty());
+        assert!(engine.resolutions().iter().all(|slot| slot.is_none()));
+    }
+
+    #[test]
+    fn un_both_aserado_recomienda_sellar_y_uno_derivado_separar() {
+        let mut engine = InferenceEngine::new();
+        engine
+            .assert(0, "סתירה", BelnapValue::Both)
+            .expect("hecho");
+        let left = engine.assert(0, "א", BelnapValue::True).expect("verdad");
+        let right = engine.assert(0, "ב", BelnapValue::False).expect("falsedad");
+        let joined = engine
+            .assert(1, "ג", BelnapValue::Neither)
+            .expect("unión");
+        engine
+            .add_rule(left, joined, RuleKind::Fusion, BelnapValue::True, Some(right))
+            .expect("regla");
+        engine.evaluate();
+        let advice: Vec<_> = engine.resolutions().into_iter().flatten().collect();
+        assert!(advice.iter().any(|item| {
+            item.root.as_str() == "סתירה" && item.tactic == ResolutionTactic::Seal
+        }));
+        assert!(advice.iter().any(|item| {
+            item.root.as_str() == "ג" && item.tactic == ResolutionTactic::Split
+        }));
+    }
+
+    #[test]
+    fn el_conflicto_complejo_ensena_a_sellar() {
+        let mut engine = InferenceEngine::new();
+        engine
+            .assert(0, "סתירה", BelnapValue::Both)
+            .expect("contradicción directa");
+        engine
+            .assert(0, "נגד", BelnapValue::Both)
+            .expect("segunda contradicción");
+        let left = engine.assert(0, "א", BelnapValue::True).expect("verdad");
+        let right = engine.assert(0, "ב", BelnapValue::False).expect("falsedad");
+        let joined = engine
+            .assert(1, "ג", BelnapValue::Neither)
+            .expect("unión");
+        engine
+            .add_rule(left, joined, RuleKind::Fusion, BelnapValue::True, Some(right))
+            .expect("fusión");
+        engine
+            .add_rule(left, joined, RuleKind::Fusion, BelnapValue::False, Some(right))
+            .expect("fusión opuesta");
+        engine.evaluate();
+        let advice: Vec<_> = engine.resolutions().into_iter().flatten().collect();
+        let seal = advice.iter().find(|item| {
+            item.root.as_str() == "סתירה" && item.tactic == ResolutionTactic::Seal
+        });
+        let split = advice.iter().find(|item| item.tactic == ResolutionTactic::Split);
+        assert!(seal.is_some(), "un ⊤∧⊥ asertado recomienda sellar");
+        assert!(split.is_some(), "una unión contradictoria recomienda separar");
+        assert!(seal
+            .expect("sello")
+            .tactic
+            .recommendation()
+            .contains("שמר"));
+        assert!(split
+            .expect("separación")
+            .tactic
+            .recommendation()
+            .contains("antecedentes"));
+        assert!(engine.anticipate("סתירה").is_none());
+        engine.absorb("סתירה", true);
+        assert!(engine.anticipate("סתירה").is_none());
+        engine.absorb("סתירה", true);
+        assert_eq!(engine.anticipate("סתירה"), Some(ResolutionTactic::Seal));
+        assert!(engine.optimizer().seal_total() >= 2);
     }
 
     #[test]

@@ -64,6 +64,79 @@ pub fn type_code(kind: BaraType) -> u8 {
     }
 }
 
+/// Dimensión fija del embedding simbólico. Cabe en una línea de caché junto
+/// con el pliegue de la raíz.
+pub const EMBEDDING_DIM: usize = 16;
+
+/// Vector simbólico en punto fijo. Cada carril es un entero con signo cuyo
+/// bit de patrón sale del polinomio del nodo y del pliegue de la raíz.
+///
+/// No hay muestreo: la misma raíz y el mismo residuo de `𝔽ₚ` producen los
+/// mismos dieciséis enteros en cualquier ejecución.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SymbolicEmbedding {
+    /// Coordenadas en `[-32768, 32767]`.
+    pub lanes: [i16; EMBEDDING_DIM],
+}
+
+impl SymbolicEmbedding {
+    /// Origen conceptual: los dieciséis carriles en cero.
+    pub const fn zero() -> Self {
+        Self {
+            lanes: [0; EMBEDDING_DIM],
+        }
+    }
+
+    /// Mezcla determinista de un pliegue de raíz y un residuo de `𝔽ₚ`.
+    pub fn from_field(fold: u64, residue: u64) -> Self {
+        let mut lanes = [0i16; EMBEDDING_DIM];
+        let mut state = fold.wrapping_mul(GOLDEN_FRACTION) ^ residue.rotate_left(13);
+        for (lane, slot) in lanes.iter_mut().enumerate() {
+            let shift = (lane as u32) & 63;
+            state = state
+                .wrapping_mul(0x0000_0100_0000_01b3)
+                ^ u64::from(lane as u32).wrapping_mul(GOLDEN_FRACTION);
+            state ^= state >> 30;
+            let mixed = state.wrapping_add(residue.rotate_left(shift));
+            let raw = u16::try_from(mixed & 0xffff).unwrap_or(0);
+            *slot = i16::from_le_bytes(raw.to_le_bytes());
+        }
+        Self { lanes }
+    }
+
+    /// Lista JSON de enteros, estable bit a bit.
+    pub fn json(&self) -> String {
+        let mut out = String::from("[");
+        for (index, lane) in self.lanes.iter().enumerate() {
+            if index > 0 {
+                out.push(',');
+            }
+            out.push_str(&lane.to_string());
+        }
+        out.push(']');
+        out
+    }
+}
+
+/// Embedding de una raíz: el pliegue `φ` y el polinomio de sus bytes en `𝔽ₚ`.
+pub fn embed_root(root: &str) -> SymbolicEmbedding {
+    let fold = root_fold(root);
+    let mut poly = Fp::ZERO;
+    let point = Fp::new(GOLDEN_FRACTION);
+    for (index, byte) in root.as_bytes().iter().enumerate() {
+        let coefficient = u64::from(*byte)
+            .wrapping_add(index as u64)
+            .wrapping_add(1);
+        poly = poly * point + Fp::new(coefficient);
+    }
+    SymbolicEmbedding::from_field(fold, poly.0)
+}
+
+/// Embedding de un nodo: pliegue de su raíz e identidad polinómica ya firmada.
+pub fn embed_node(node: &ShoreshNode) -> SymbolicEmbedding {
+    SymbolicEmbedding::from_field(root_fold(&node.root), node_identity(node).0)
+}
+
 /// Pliegue armónico de una raíz: huella de 64 bits mezclada con `φ`.
 ///
 /// Es determinista y total: cualquier texto (incluido el vacío) produce un
@@ -256,6 +329,13 @@ pub fn verify(label: &str, ast: &ShoreshAst, dna: &AstDna, key: &[u8; 32]) -> bo
         && fresh.nodes.len() == dna.nodes.len()
         && signature_is_valid(dna, key)
 }
+
+/// Raíz de Merkle del módulo canónico de `ast_dna` para la release `v0.2.0`.
+///
+/// Se rellena al fijar el sello. El test `el_sello_v02_es_el_adn_del_modulo_canonico`
+/// exige que coincida con `ast_dna("modulo-genesis", fixture, golden_key)`.
+pub const RELEASE_V02_DNA: &str =
+    "3ab911441a8f7a0eb05877944706d472d109e6697c3e506376fce7f0e7c9db95";
 
 /// Representación hexadecimal de una huella (informes, sellos y log).
 pub fn short_hex(bytes: &[u8]) -> String {
@@ -479,5 +559,12 @@ mod tests {
         assert_eq!(both, 1);
         assert_eq!(neither, 0);
         assert_eq!(short_hex(&dna.root[..2]).len(), 4);
+    }
+
+    #[test]
+    fn el_sello_v02_es_el_adn_del_modulo_canonico() {
+        let dna = ast_dna("modulo-genesis", &fixture(), &golden_key(b"semilla"));
+        assert_eq!(short_hex(&dna.root), RELEASE_V02_DNA);
+        assert!(signature_is_valid(&dna, &golden_key(b"semilla")));
     }
 }
