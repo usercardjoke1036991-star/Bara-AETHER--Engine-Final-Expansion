@@ -214,7 +214,9 @@ mod tests {
 
     #[test]
     fn la_tarjeta_sale_de_la_cabecera_sin_leer_pesos() {
-        let card = read_card(&sample()).expect("gguf");
+        let Ok(card) = read_card(&sample()) else {
+            panic!("gguf");
+        };
         assert_eq!(card.version, 3);
         assert_eq!(card.architecture, "neura");
         assert_eq!(card.name, "bara-local");

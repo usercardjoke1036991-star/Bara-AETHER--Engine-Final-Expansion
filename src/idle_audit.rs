@@ -33,7 +33,10 @@ pub fn propose(language: SourceLanguage, source: &str) -> Option<IdleProposal> {
         .collect();
     let mut lines: BTreeMap<String, Vec<u32>> = BTreeMap::new();
     for symbol in &decls {
-        lines.entry(symbol.name.clone()).or_default().push(symbol.line);
+        lines
+            .entry(symbol.name.clone())
+            .or_default()
+            .push(symbol.line);
     }
     let (name, copies) = lines.iter().find(|(_, rows)| rows.len() >= 2)?;
     let first = *copies.first()?;
@@ -101,11 +104,9 @@ mod tests {
 
     #[test]
     fn la_copia_identica_se_retira_y_el_cuerpo_distinto_no() {
-        let clean = propose(
-            SourceLanguage::Rust,
-            "fn alpha() {}\nfn alpha() {}\n",
-        )
-        .expect("copia");
+        let Some(clean) = propose(SourceLanguage::Rust, "fn alpha() {}\nfn alpha() {}\n") else {
+            panic!("copia");
+        };
         assert_eq!(clean.name, "alpha");
         assert_eq!(clean.revised.matches("fn alpha()").count(), 1);
         assert!(propose(

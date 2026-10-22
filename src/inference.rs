@@ -347,7 +347,12 @@ impl RuleOptimizer {
         let Some(key) = RootKey::new(root) else {
             return;
         };
-        if let Some(slot) = self.slots.iter_mut().flatten().find(|prior| prior.root == key) {
+        if let Some(slot) = self
+            .slots
+            .iter_mut()
+            .flatten()
+            .find(|prior| prior.root == key)
+        {
             if seal {
                 slot.seal = slot.seal.saturating_add(1);
             } else {
@@ -367,7 +372,11 @@ impl RuleOptimizer {
     /// Táctica anticipada, si el rastro ya es consistente.
     pub fn anticipate(&self, root: &str) -> Option<ResolutionTactic> {
         let key = RootKey::new(root)?;
-        let prior = self.slots.iter().flatten().find(|prior| prior.root == key)?;
+        let prior = self
+            .slots
+            .iter()
+            .flatten()
+            .find(|prior| prior.root == key)?;
         if prior.seal >= CONSISTENT_REPETITIONS && prior.seal > prior.split {
             Some(ResolutionTactic::Seal)
         } else if prior.split >= CONSISTENT_REPETITIONS && prior.split > prior.seal {
@@ -1057,6 +1066,13 @@ impl Default for InferenceEngine {
 mod tests {
     use super::*;
 
+    fn listo<T, E: core::fmt::Debug>(value: Result<T, E>) -> T {
+        match value {
+            Ok(item) => item,
+            Err(err) => panic!("el caso de prueba no salio: {err:?}"),
+        }
+    }
+
     #[test]
     fn el_motor_vacio_es_coherente() {
         let mut engine = InferenceEngine::new();
@@ -1073,65 +1089,65 @@ mod tests {
     #[test]
     fn un_both_aserado_recomienda_sellar_y_uno_derivado_separar() {
         let mut engine = InferenceEngine::new();
-        engine
-            .assert(0, "סתירה", BelnapValue::Both)
-            .expect("hecho");
-        let left = engine.assert(0, "א", BelnapValue::True).expect("verdad");
-        let right = engine.assert(0, "ב", BelnapValue::False).expect("falsedad");
-        let joined = engine
-            .assert(1, "ג", BelnapValue::Neither)
-            .expect("unión");
-        engine
-            .add_rule(left, joined, RuleKind::Fusion, BelnapValue::True, Some(right))
-            .expect("regla");
+        listo(engine.assert(0, "סתירה", BelnapValue::Both));
+        let left = listo(engine.assert(0, "א", BelnapValue::True));
+        let right = listo(engine.assert(0, "ב", BelnapValue::False));
+        let joined = listo(engine.assert(1, "ג", BelnapValue::Neither));
+        listo(engine.add_rule(
+            left,
+            joined,
+            RuleKind::Fusion,
+            BelnapValue::True,
+            Some(right),
+        ));
         engine.evaluate();
         let advice: Vec<_> = engine.resolutions().into_iter().flatten().collect();
         assert!(advice.iter().any(|item| {
             item.root.as_str() == "סתירה" && item.tactic == ResolutionTactic::Seal
         }));
-        assert!(advice.iter().any(|item| {
-            item.root.as_str() == "ג" && item.tactic == ResolutionTactic::Split
-        }));
+        assert!(advice
+            .iter()
+            .any(|item| { item.root.as_str() == "ג" && item.tactic == ResolutionTactic::Split }));
     }
 
     #[test]
     fn el_conflicto_complejo_ensena_a_sellar() {
         let mut engine = InferenceEngine::new();
-        engine
-            .assert(0, "סתירה", BelnapValue::Both)
-            .expect("contradicción directa");
-        engine
-            .assert(0, "נגד", BelnapValue::Both)
-            .expect("segunda contradicción");
-        let left = engine.assert(0, "א", BelnapValue::True).expect("verdad");
-        let right = engine.assert(0, "ב", BelnapValue::False).expect("falsedad");
-        let joined = engine
-            .assert(1, "ג", BelnapValue::Neither)
-            .expect("unión");
-        engine
-            .add_rule(left, joined, RuleKind::Fusion, BelnapValue::True, Some(right))
-            .expect("fusión");
-        engine
-            .add_rule(left, joined, RuleKind::Fusion, BelnapValue::False, Some(right))
-            .expect("fusión opuesta");
+        listo(engine.assert(0, "סתירה", BelnapValue::Both));
+        listo(engine.assert(0, "נגד", BelnapValue::Both));
+        let left = listo(engine.assert(0, "א", BelnapValue::True));
+        let right = listo(engine.assert(0, "ב", BelnapValue::False));
+        let joined = listo(engine.assert(1, "ג", BelnapValue::Neither));
+        listo(engine.add_rule(
+            left,
+            joined,
+            RuleKind::Fusion,
+            BelnapValue::True,
+            Some(right),
+        ));
+        listo(engine.add_rule(
+            left,
+            joined,
+            RuleKind::Fusion,
+            BelnapValue::False,
+            Some(right),
+        ));
         engine.evaluate();
         let advice: Vec<_> = engine.resolutions().into_iter().flatten().collect();
-        let seal = advice.iter().find(|item| {
-            item.root.as_str() == "סתירה" && item.tactic == ResolutionTactic::Seal
-        });
-        let split = advice.iter().find(|item| item.tactic == ResolutionTactic::Split);
-        assert!(seal.is_some(), "un ⊤∧⊥ asertado recomienda sellar");
-        assert!(split.is_some(), "una unión contradictoria recomienda separar");
-        assert!(seal
-            .expect("sello")
-            .tactic
-            .recommendation()
-            .contains("שמר"));
-        assert!(split
-            .expect("separación")
-            .tactic
-            .recommendation()
-            .contains("antecedentes"));
+        let seal = advice
+            .iter()
+            .find(|item| item.root.as_str() == "סתירה" && item.tactic == ResolutionTactic::Seal);
+        let split = advice
+            .iter()
+            .find(|item| item.tactic == ResolutionTactic::Split);
+        assert!(
+            seal.is_some_and(|item| item.tactic.recommendation().contains("שמר")),
+            "un ⊤∧⊥ asertado recomienda sellar"
+        );
+        assert!(
+            split.is_some_and(|item| item.tactic.recommendation().contains("antecedentes")),
+            "una unión contradictoria recomienda separar"
+        );
         assert!(engine.anticipate("סתירה").is_none());
         engine.absorb("סתירה", true);
         assert!(engine.anticipate("סתירה").is_none());
