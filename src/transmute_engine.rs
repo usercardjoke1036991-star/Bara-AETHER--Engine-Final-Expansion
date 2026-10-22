@@ -60,12 +60,8 @@ pub struct ProjectTransmutation {
 /// queda fuera de la raíz se ignora. El orden de lectura es el de la ruta
 /// relativa, no el del sistema de archivos.
 pub fn transmute_workspace_dir(root: &Path) -> Result<ProjectTransmutation, String> {
-    let root = fs::canonicalize(root).map_err(|err| {
-        format!(
-            "no se pudo canonizar «{}»: {err}",
-            root.display()
-        )
-    })?;
+    let root = fs::canonicalize(root)
+        .map_err(|err| format!("no se pudo canonizar «{}»: {err}", root.display()))?;
     let meta = fs::symlink_metadata(&root)
         .map_err(|err| format!("no se pudo inspeccionar «{}»: {err}", root.display()))?;
     if meta.file_type().is_symlink() || !meta.is_dir() {
@@ -145,9 +141,8 @@ fn collect(
     if depth > MAX_DEPTH {
         return Ok(());
     }
-    let entries = fs::read_dir(dir).map_err(|err| {
-        format!("no se pudo enumerar «{}»: {err}", dir.display())
-    })?;
+    let entries = fs::read_dir(dir)
+        .map_err(|err| format!("no se pudo enumerar «{}»: {err}", dir.display()))?;
     for entry in entries {
         let entry = entry.map_err(|err| format!("entrada ilegible: {err}"))?;
         let path = entry.path();
@@ -198,8 +193,8 @@ fn stream_file(
     path: &Path,
     language: SourceLanguage,
 ) -> Result<(usize, usize, Vec<ShoreshNode>), String> {
-    let file = File::open(path)
-        .map_err(|err| format!("no se pudo abrir «{}»: {err}", path.display()))?;
+    let file =
+        File::open(path).map_err(|err| format!("no se pudo abrir «{}»: {err}", path.display()))?;
     let mut reader = BufReader::new(file);
     let mut line = String::new();
     let mut window = String::new();

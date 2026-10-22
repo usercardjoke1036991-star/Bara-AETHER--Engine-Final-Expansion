@@ -235,7 +235,8 @@ pub fn judge_patch(language: SourceLanguage, host: &str, patch: &str) -> BelnapV
     let host_names = declarations(&parse(language, host));
     let mut seen: Vec<String> = Vec::new();
     for name in declarations(&incoming) {
-        if seen.iter().any(|previous| previous == &name) || host_names.iter().any(|previous| previous == &name)
+        if seen.iter().any(|previous| previous == &name)
+            || host_names.iter().any(|previous| previous == &name)
         {
             return BelnapValue::Both;
         }
@@ -449,8 +450,10 @@ impl<'a> Parser<'a> {
         );
         let ty = matches!(
             (self.language, word.as_str()),
-            (SourceLanguage::Rust, "struct" | "enum" | "trait" | "union" | "type" | "impl")
-                | (SourceLanguage::JavaScript, "class" | "interface" | "type")
+            (
+                SourceLanguage::Rust,
+                "struct" | "enum" | "trait" | "union" | "type" | "impl"
+            ) | (SourceLanguage::JavaScript, "class" | "interface" | "type")
                 | (SourceLanguage::Python, "class")
                 | (
                     SourceLanguage::Solidity,
@@ -658,7 +661,8 @@ impl<'a> Parser<'a> {
             }
             return Some((clip(&name, 32), clip(&ty, 48)));
         }
-        if matches!(self.language, SourceLanguage::Go | SourceLanguage::C) && self.kind_is(Kind::Ident)
+        if matches!(self.language, SourceLanguage::Go | SourceLanguage::C)
+            && self.kind_is(Kind::Ident)
         {
             let ty = self.read_type_until(&[",", ";", "}"]);
             if self.punct(",") || self.punct(";") {
@@ -753,7 +757,11 @@ impl<'a> Parser<'a> {
         if !self.punct("(") {
             return String::new();
         }
-        let start = self.tokens.get(self.index).map(|token| token.hi).unwrap_or(0);
+        let start = self
+            .tokens
+            .get(self.index)
+            .map(|token| token.hi)
+            .unwrap_or(0);
         self.bump();
         let mut depth = 1i32;
         let mut end = start;
@@ -820,7 +828,9 @@ impl<'a> Parser<'a> {
             self.bump();
         }
         match (lo, hi) {
-            (Some(start), Some(end)) => self.source.get(start..end).unwrap_or("").trim().to_string(),
+            (Some(start), Some(end)) => {
+                self.source.get(start..end).unwrap_or("").trim().to_string()
+            }
             _ => String::new(),
         }
     }
@@ -848,7 +858,12 @@ impl<'a> Parser<'a> {
         self.skip_newlines();
         self.named_line = self.cursor_line();
         match self.word() {
-            Some(name) if !matches!(name.as_str(), "struct" | "enum" | "interface" | "for" | "is") => {
+            Some(name)
+                if !matches!(
+                    name.as_str(),
+                    "struct" | "enum" | "interface" | "for" | "is"
+                ) =>
+            {
                 self.bump();
                 clip(&name, MAX_NAME)
             }
@@ -955,7 +970,9 @@ impl<'a> Parser<'a> {
     }
 
     fn at(&self, kind: Kind) -> bool {
-        self.tokens.get(self.index).is_some_and(|token| token.kind == kind)
+        self.tokens
+            .get(self.index)
+            .is_some_and(|token| token.kind == kind)
     }
 
     fn kind_is(&self, kind: Kind) -> bool {
@@ -1051,7 +1068,8 @@ fn is_decl_word(word: &str) -> bool {
 fn is_modifier(word: &str) -> bool {
     matches!(
         word,
-        "public" | "private"
+        "public"
+            | "private"
             | "internal"
             | "external"
             | "view"
@@ -1098,7 +1116,10 @@ fn param_of(piece: &str, style: ParamStyle) -> Option<(String, String)> {
 
 fn colon_param(piece: &str) -> (String, String) {
     if let Some(index) = top_colon(piece) {
-        (bind_name(&piece[..index]), clip(piece[index + 1..].trim(), 48))
+        (
+            bind_name(&piece[..index]),
+            clip(piece[index + 1..].trim(), 48),
+        )
     } else {
         (bind_name(piece), String::new())
     }
@@ -1124,14 +1145,14 @@ fn bind_name(piece: &str) -> String {
         .into_iter()
         .filter(|word| !matches!(word.as_str(), "mut" | "pub" | "ref" | "const"))
         .collect();
-    filtered
-        .last()
-        .cloned()
-        .unwrap_or_else(|| "_".to_string())
+    filtered.last().cloned().unwrap_or_else(|| "_".to_string())
 }
 
 fn first_ident(piece: &str) -> String {
-    idents(piece.trim_start_matches(['*', '&', ' '])).into_iter().next().unwrap_or_default()
+    idents(piece.trim_start_matches(['*', '&', ' ']))
+        .into_iter()
+        .next()
+        .unwrap_or_default()
 }
 
 fn idents(piece: &str) -> Vec<String> {
@@ -1612,7 +1633,8 @@ mod tests {
 
     #[test]
     fn rust_extrae_tipo_parametro_retorno_y_llamada_anidada() {
-        let source = "struct Point { x: i32, y: i32 }\nfn length(p: &Point) -> i32 {\n    helper(p)\n}\n";
+        let source =
+            "struct Point { x: i32, y: i32 }\nfn length(p: &Point) -> i32 {\n    helper(p)\n}\n";
         let tree = parse(SourceLanguage::Rust, source);
         let nodes = tree.into_nodes(SourceLanguage::Rust);
         let point = find(&nodes, "name=Point:");
@@ -1634,7 +1656,10 @@ mod tests {
 
     #[test]
     fn los_otros_lenguajes_conservan_el_nombre_y_el_padre() {
-        let py = parse(SourceLanguage::Python, "class Caja:\n    def abrir(self):\n        return 1\n");
+        let py = parse(
+            SourceLanguage::Python,
+            "class Caja:\n    def abrir(self):\n        return 1\n",
+        );
         let nodes = py.into_nodes(SourceLanguage::Python);
         assert!(find(&nodes, "name=abrir:").original.contains("parent=Caja"));
 
@@ -1646,9 +1671,14 @@ mod tests {
         let transfer = find(&nodes, "name=transfer:");
         assert!(transfer.original.contains("parent=Token"));
         assert_eq!(transfer.ret, BaraType::Truth);
-        assert!(find(&nodes, "name=send:").original.contains("parent=transfer"));
+        assert!(find(&nodes, "name=send:")
+            .original
+            .contains("parent=transfer"));
 
-        let go = parse(SourceLanguage::Go, "package main\nfunc main() int { ping() }\n");
+        let go = parse(
+            SourceLanguage::Go,
+            "package main\nfunc main() int { ping() }\n",
+        );
         let nodes = go.into_nodes(SourceLanguage::Go);
         assert_eq!(find(&nodes, "name=main:").ret, BaraType::Number);
         assert!(find(&nodes, "name=ping:").original.contains("parent=main"));

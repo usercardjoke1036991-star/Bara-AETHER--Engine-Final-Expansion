@@ -3068,9 +3068,7 @@ impl AutopoieticMutator {
 
     /// Anota un patrón de repetición en el log. No escribe en el núcleo.
     pub fn note_repetition(&mut self, fingerprint: u64, repetitions: u32) {
-        self.log(format!(
-            "repeticion fp={fingerprint:016x} n={repetitions}"
-        ));
+        self.log(format!("repeticion fp={fingerprint:016x} n={repetitions}"));
     }
 
     /// Anota una entrada en el log ontológico, respetando [`JOURNAL_LIMIT`].

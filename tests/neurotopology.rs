@@ -69,7 +69,13 @@ fn el_solape_eleva_both_y_el_vecindario_separa_sin_colapsar() {
         Err(error) => panic!("unión: {error}"),
     };
     assert!(engine
-        .add_rule(left, joined, RuleKind::Fusion, BelnapValue::True, Some(right))
+        .add_rule(
+            left,
+            joined,
+            RuleKind::Fusion,
+            BelnapValue::True,
+            Some(right)
+        )
         .is_ok());
     let before = engine.evaluate();
     assert!(engine.raise_overlap("ג"));
@@ -83,9 +89,10 @@ fn el_solape_eleva_both_y_el_vecindario_separa_sin_colapsar() {
         Some(ResolutionTactic::Split)
     );
     let advice = engine.resolutions();
-    assert!(advice.iter().flatten().any(|item| {
-        item.root.as_str() == "ג" && item.tactic == ResolutionTactic::Split
-    }));
+    assert!(advice
+        .iter()
+        .flatten()
+        .any(|item| { item.root.as_str() == "ג" && item.tactic == ResolutionTactic::Split }));
     let after = engine.report(before.applied, before.changed);
     assert!(after.both_count >= before.both_count);
     assert!(engine.node_count() > 0);

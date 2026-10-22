@@ -14,8 +14,8 @@
 //!   estados y log ontológico.
 
 use crate::ffi_ingest::{self, IngestedDecl, ShoreshNode};
-use crate::inference::RuleOptimizer;
 use crate::fractal_geometry::FractalLayout;
+use crate::inference::RuleOptimizer;
 use crate::lexer::{Keyword, Token, TokenKind};
 use crate::memory_region::{Device, RegionKind, RegionTable};
 use crate::mesh_sync::{MeshCluster, SyncReport};
@@ -317,7 +317,10 @@ impl AutopoieticMutator {
 
     /// Suma de apariciones registradas.
     pub fn sightings_total(&self) -> u32 {
-        self.sightings.values().copied().fold(0, u32::saturating_add)
+        self.sightings
+            .values()
+            .copied()
+            .fold(0, u32::saturating_add)
     }
 
     /// Entradas vivas del ledger.
@@ -1245,8 +1248,8 @@ impl BaraRuntime {
         let left = self.pop();
         match (left, right) {
             (Some(left), Some(right)) => {
-                let contradictory = left.observe() == Observation::Both
-                    || right.observe() == Observation::Both;
+                let contradictory =
+                    left.observe() == Observation::Both || right.observe() == Observation::Both;
                 let state = left.conjunction(&right);
                 if contradictory && state.observe() != Observation::Both {
                     let pattern = format!(
@@ -1415,7 +1418,11 @@ mod tests {
         let second = mutator.synthesize("אבג");
         let (_, falsity_again) = second.valence.belnap();
         assert!(falsity_again < falsity);
-        assert_eq!(mutator.generation(), 1, "una repetición no crea otro axioma");
+        assert_eq!(
+            mutator.generation(),
+            1,
+            "una repetición no crea otro axioma"
+        );
         assert_eq!(mutator.ledger_len(), 2);
         assert_eq!(mutator.ledger_last_root(), Some("אבג"));
         assert_eq!(mutator.sightings_total(), 2);

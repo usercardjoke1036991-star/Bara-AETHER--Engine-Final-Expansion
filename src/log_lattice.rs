@@ -100,13 +100,19 @@ mod tests {
             observe_log_line("error[E0308]: mismatched types"),
             BelnapValue::False
         );
-        assert_eq!(observe_log_line("warning: unused variable"), BelnapValue::Both);
+        assert_eq!(
+            observe_log_line("warning: unused variable"),
+            BelnapValue::Both
+        );
         assert_eq!(
             observe_log_line("test result: ok. 1 passed"),
             BelnapValue::True
         );
         assert_eq!(observe_log_line("   Compiling bara"), BelnapValue::Neither);
-        assert_eq!(observe_log_line("src/error_handler.rs"), BelnapValue::Neither);
+        assert_eq!(
+            observe_log_line("src/error_handler.rs"),
+            BelnapValue::Neither
+        );
         assert_eq!(observe_log_line("⊤∧⊥ en el nodo"), BelnapValue::Both);
         assert_eq!(
             observe_log_line("src/App.tsx(3,1): error TS2322: tipo"),

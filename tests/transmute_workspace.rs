@@ -40,7 +40,10 @@ fn un_directorio_heterogeneo_produce_una_carta_determinista() {
     assert!(first.statements > 0);
     assert!(!first.nodes.is_empty());
     assert_eq!(first.topology.nodes, second.topology.nodes);
-    assert_eq!(first.topology.cohesion_milli, second.topology.cohesion_milli);
+    assert_eq!(
+        first.topology.cohesion_milli,
+        second.topology.cohesion_milli
+    );
     assert!(first.languages.windows(2).all(|pair| pair[0] <= pair[1]));
     assert!(first.languages.contains(&"sol"));
     assert!(first.languages.contains(&"rs"));

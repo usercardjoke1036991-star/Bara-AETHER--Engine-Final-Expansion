@@ -35,9 +35,9 @@ use crate::autopoietic::BelnapValue;
 use crate::crypto_native::Sha256;
 use crate::ide_bridge::{BridgeError, Section, SectionKind};
 use crate::inference::{InferenceReport, ResolutionAdvice, RootKey};
-use crate::topology::{AstChart, MetricPoint, METRIC_CAP};
 use crate::long_term_memory::LongTermMemory;
 use crate::neural_it::{NeuralIt, SemanticView};
+use crate::topology::{AstChart, MetricPoint, METRIC_CAP};
 
 /// Dominio de hash del puente neuronal.
 pub const NEURAL_DOMAIN: &[u8] = b"bara:aether-omega:puente-neuronal:v1";
@@ -627,7 +627,10 @@ pub fn root_edit_distance(left: &str, right: &str) -> u32 {
         }
         for column in 1..=cols {
             let left_byte = left_bytes.get(row.saturating_sub(1)).copied().unwrap_or(0);
-            let right_byte = right_bytes.get(column.saturating_sub(1)).copied().unwrap_or(0);
+            let right_byte = right_bytes
+                .get(column.saturating_sub(1))
+                .copied()
+                .unwrap_or(0);
             let cost = u16::from(left_byte != right_byte);
             let deletion = prev.get(column).copied().unwrap_or(0).saturating_add(1);
             let insertion = curr

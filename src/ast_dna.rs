@@ -93,8 +93,7 @@ impl SymbolicEmbedding {
         let mut state = fold.wrapping_mul(GOLDEN_FRACTION) ^ residue.rotate_left(13);
         for (lane, slot) in lanes.iter_mut().enumerate() {
             let shift = (lane as u32) & 63;
-            state = state
-                .wrapping_mul(0x0000_0100_0000_01b3)
+            state = state.wrapping_mul(0x0000_0100_0000_01b3)
                 ^ u64::from(lane as u32).wrapping_mul(GOLDEN_FRACTION);
             state ^= state >> 30;
             let mixed = state.wrapping_add(residue.rotate_left(shift));
@@ -124,9 +123,7 @@ pub fn embed_root(root: &str) -> SymbolicEmbedding {
     let mut poly = Fp::ZERO;
     let point = Fp::new(GOLDEN_FRACTION);
     for (index, byte) in root.as_bytes().iter().enumerate() {
-        let coefficient = u64::from(*byte)
-            .wrapping_add(index as u64)
-            .wrapping_add(1);
+        let coefficient = u64::from(*byte).wrapping_add(index as u64).wrapping_add(1);
         poly = poly * point + Fp::new(coefficient);
     }
     SymbolicEmbedding::from_field(fold, poly.0)

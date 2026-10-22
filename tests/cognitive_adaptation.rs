@@ -36,10 +36,16 @@ fn el_embedding_repite_el_mismo_vector_y_mide_cero_consigo() {
     assert_ne!(origen, distinta);
     assert_eq!(embed_node(&nodo("שמר")), embed_node(&nodo("שמר")));
     assert_eq!(conceptual_milli(origen, otra), 1000);
-    assert_eq!(conceptual_milli(origen, distinta), conceptual_milli(distinta, origen));
+    assert_eq!(
+        conceptual_milli(origen, distinta),
+        conceptual_milli(distinta, origen)
+    );
     assert_eq!(conceptual_cosine(origen, origen), 1.0);
     assert_eq!(conceptual_euclidean(origen, origen), 0.0);
-    assert_eq!(conceptual_milli(origen, distinta), conceptual_milli(origen, distinta));
+    assert_eq!(
+        conceptual_milli(origen, distinta),
+        conceptual_milli(origen, distinta)
+    );
 }
 
 #[test]
@@ -52,8 +58,14 @@ fn la_atencion_prioriza_la_raiz_mas_evaluada_sin_reloj() {
     assert_eq!(first.mutator.attention_of("צור"), 7);
     assert_eq!(first.mutator.attention_of("אבג"), 4);
     assert_eq!(first.mutator.priority_root(), Some("צור"));
-    assert_eq!(first.mutator.attention_total(), second.mutator.attention_total());
-    assert_eq!(first.mutator.priority_root(), second.mutator.priority_root());
+    assert_eq!(
+        first.mutator.attention_total(),
+        second.mutator.attention_total()
+    );
+    assert_eq!(
+        first.mutator.priority_root(),
+        second.mutator.priority_root()
+    );
     assert_eq!(first.mutator.generation(), 2);
 }
 
@@ -81,7 +93,14 @@ fn el_juicio_repetido_anticipa_y_el_usuario_no_toca_el_nucleo() {
         runtime.correction.anticipate("אבג"),
         Some(ResolutionTactic::Seal)
     );
-    assert_eq!(runtime.timeline.resolutions().last().map(|trace| trace.origin), Some(ResolutionOrigin::User));
+    assert_eq!(
+        runtime
+            .timeline
+            .resolutions()
+            .last()
+            .map(|trace| trace.origin),
+        Some(ResolutionOrigin::User)
+    );
 }
 
 #[test]
@@ -100,7 +119,13 @@ fn la_historia_cambia_el_consejo_sin_cambiar_el_valor() {
         Err(error) => panic!("unión: {error}"),
     };
     assert!(engine
-        .add_rule(left, joined, RuleKind::Fusion, BelnapValue::True, Some(right))
+        .add_rule(
+            left,
+            joined,
+            RuleKind::Fusion,
+            BelnapValue::True,
+            Some(right)
+        )
         .is_ok());
     let before = engine.evaluate();
     assert!(engine
