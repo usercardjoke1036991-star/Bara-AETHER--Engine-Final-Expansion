@@ -13,10 +13,16 @@ readme = "README.md"
 [lib]
 name = "bara"
 path = "src/lib.rs"
-# `rlib` para los consumidores Rust (IDE, CLI, suite de integración) y `cdylib`
-# para la frontera FFI: `cargo build --release --target aarch64-linux-android`
-# produce `libbara.so` con los símbolos `bara_ffi_*` de `src/ffi.rs`.
-crate-type = ["rlib", "cdylib"]
+# Sólo `rlib`. El binario se llama igual que la biblioteca (`bara`). Si este
+# target también emite `cdylib`, en MSVC con LTO (`codegen-units = 1`) Cargo
+# choca `bara.dll` / `bara.pdb` con `bara.exe` y `link.exe` cierra el
+# ejecutable sin la rlib: LNK2019 (cargo#6313). El release de Linux no lo
+# sufre; el de Windows sí, y tumba `cargo test --all-targets --release`.
+# La frontera FFI (`src/ffi.rs`) sigue en esta rlib. La biblioteca compartida
+# se pide aparte, sin cambiar este target:
+#   cargo rustc --release --target aarch64-linux-android --lib --crate-type cdylib
+# Eso produce `libbara.so` con los símbolos `bara_ffi_*`.
+crate-type = ["rlib"]
 
 [dependencies]
 
