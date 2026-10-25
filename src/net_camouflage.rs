@@ -42,6 +42,12 @@
 //! Nada de esto esconde el tráfico: la puerta abierta del núcleo
 //! ([`crate::immunity_gateway`]) sigue siendo pública. El camuflaje protege la
 //! **identidad del enjambre**, no la existencia del canal.
+//!
+//! **No es un cliente HTTPS de la web pública.** [`HttpsSession::connect`] no
+//! lee `Certificate` ni `CertificateVerify`: el azar, el `session_id` y el
+//! escalar X25519 salen del ADN, así que el mismo ADN repite el mismo saludo
+//! y no hay secreto hacia adelante. Sirve para que dos nodos Bara se
+//! reconozcan. Contra un servidor ajeno el eco no cuadra y no hay sesión.
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -1960,8 +1966,9 @@ pub struct HttpsSession {
 impl HttpsSession {
     /// Abre una sesión: envía el saludo camuflado y procesa la respuesta.
     ///
-    /// Devuelve `None` ante cualquier fallo de red, eco incoherente, cifrado no
-    /// ofrecido o versión distinta de TLS 1.3. Nunca entra en pánico.
+    /// No valida la cadena de certificados de la web pública. Devuelve `None`
+    /// ante cualquier fallo de red, eco incoherente, cifrado no ofrecido o
+    /// versión distinta de TLS 1.3. Nunca entra en pánico.
     pub fn connect(address: &str, profile: CamouflageProfile, seed: &[u8]) -> Option<HttpsSession> {
         let mut stream = TcpStream::connect(address).ok()?;
         stream

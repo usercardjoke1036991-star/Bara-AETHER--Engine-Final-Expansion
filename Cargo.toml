@@ -6,6 +6,7 @@ description = "Bara (בָּרָא) — El Lenguaje de Programación Supremo Tras
 license = "MIT"
 repository = "https://github.com/usercardjoke1036991-star/Bara-AETHER--Engine-Final-Expansion"
 readme = "README.md"
+default-run = "bara"
 
 # El núcleo vive en `src/lib.rs` para que el binario `bara` y la suite de
 # integración (`tests/`) compartan exactamente los mismos tipos (cero duplicación

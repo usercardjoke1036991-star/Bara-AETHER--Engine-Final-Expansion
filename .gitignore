@@ -2,6 +2,8 @@
 /target
 **/*.rs.bk
 *.pdb
+run.log
+run.oracle.log
 
 # ── Volcados y temporales de sesión de agente ─────────────────────────────
 _*.log

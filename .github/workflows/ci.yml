@@ -3,8 +3,7 @@
 #  CI · Bara (בָּרָא) / AETHER-Ω — Integración continua del kernel
 #
 #  Objetivo: ningún cambio llega a `dev` (y por tanto a `main`) sin pasar la
-#  suite completa —110 pruebas del kernel (59 unitarias + 51 de integración)
-#  más las 34 del motor del IDE: 144 en el workspace— en los perfiles debug y
+#  suite completa del kernel en los perfiles debug y
 #  release, en Linux y Windows, con política estricta de cero advertencias
 #  (`RUSTFLAGS = -D warnings`).
 # ══════════════════════════════════════════════════════════════════════════
