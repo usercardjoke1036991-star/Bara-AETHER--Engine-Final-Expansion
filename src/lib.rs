@@ -11,7 +11,8 @@
 //!   holográfica de entropía cero y log ontológico.
 //! * [`memory_region`] — inferencia de regiones por rangos de vida y vistas
 //!   *zero-copy* CPU/GPU.
-//! * [`zk_proof`] — pipeline ZK‑SNARK didáctico sobre `𝔽ₚ` (`P = 2⁶¹ − 1`).
+//! * [`zk_proof`] — pipeline ZK‑SNARK **didáctico/simulado** sobre `𝔽ₚ`
+//!   (`P = 2⁶¹ − 1`); ver [`zk_proof::DIDACTIC_ZK`].
 //! * [`ffi_ingest`] — ingesta omnívora de C/Python hacia el AST *Shoresh*.
 //! * [`fractal_geometry`] — proporción áurea (`φ`) y retícula de Fibonacci para
 //!   el reparto espacial de la memoria holográfica y de la tabla de regiones.
@@ -20,7 +21,7 @@
 //!   Bell.
 //! * [`mesh_sync`] — malla global holográfica (bus en proceso e hilos `std`).
 //! * [`metal_ir`] — *layout* abstracto de registros, ISA de 32 bits y bypass del
-//!   driver.
+//!   driver (**simulación didáctica**; ver [`metal_ir::DIDACTIC_METAL_IR`]).
 //! * [`repl`] — oráculo REPL: lengua natural → programa *Shoresh*.
 //! * [`bsc_bridge`] — puente híbrido con BNB Smart Chain (EVM): RLP, keccak‑256,
 //!   secp256k1/EIP‑155 (Chain ID 56), ABI/BEP‑20 y cliente JSON‑RPC propio; cada

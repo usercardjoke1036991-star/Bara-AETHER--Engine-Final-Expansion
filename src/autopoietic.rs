@@ -4919,6 +4919,47 @@ mod tests {
     }
 
     #[test]
+    fn veto_belnap_both_y_rollback_por_release() {
+        let kernel = genesis();
+        let digest_before = kernel.digest();
+        let revision_before = kernel.revision();
+        let mut mutator = AutopoieticMutator::new(SEED);
+        let cell = mutator.open_cell(kernel.read());
+        // Valencia Both (truth=1, falsity=1): contradicción retenida → veto.
+        assert!(applied(
+            &mut mutator,
+            cell,
+            &Mutation::Add {
+                root: "שפט".to_string(),
+                original: "legacy_both".to_string(),
+                arity: 1,
+                ret: BaraType::Number,
+                hazard: 0.0,
+                truth: 1.0,
+                falsity: 1.0,
+            },
+        )
+        .is_applied());
+        let id = mutator.propose(kernel.read(), cell, &green()).unwrap_or(0);
+        if let Some(found) = mutator.proposal(id) {
+            assert!(
+                found.verdict.contradictions > 0 || found.verdict.periferia == BelnapValue::Both,
+                "debía verse Both/contradicción"
+            );
+            assert!(!found.verdict.admits_fusion());
+        }
+        let refused = mutator.commit(&kernel, id);
+        assert!(matches!(
+            &refused,
+            Err(MutatorError::VerdictRejected { .. })
+        ));
+        assert!(mutator.release(cell), "rollback: liberar la celda");
+        assert_eq!(kernel.digest(), digest_before);
+        assert_eq!(kernel.revision(), revision_before);
+        assert!(mutator.cell(cell).is_none());
+    }
+
+    #[test]
     fn fusion_rechaza_indeterminacion() {
         let kernel = genesis();
         let mut mutator = AutopoieticMutator::new(SEED);

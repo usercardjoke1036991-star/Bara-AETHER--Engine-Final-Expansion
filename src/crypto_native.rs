@@ -36,6 +36,19 @@
 //! ([`digest_eq`]) es de tiempo constante, que es la que decide si un mensaje
 //! se acepta. El objetivo es la **soberanía**: firmar el ADN del AST y
 //! camuflar el tráfico sin arrastrar bibliotecas externas al núcleo.
+//!
+//! ## AEAD didáctico (AES-GCM / ChaCha20-Poly1305)
+//! `aead_seal` / `aead_open` y `aes128_gcm_seal` / `aes128_gcm_open` son
+//! **simulaciones didácticas**: no prometen seguridad real frente a un
+//! adversario. Fuera de `cargo test` sólo responden si la feature
+//! `didactic_crypto` está activa; en builds de producción por defecto
+//! rechazan sellar/abrir (`None` / vector vacío). Detalle histórico en
+//! [`docs/CRYPTO_DIDACTICA.md`](../docs/CRYPTO_DIDACTICA.md).
+
+/// ¿Está habilitado el AEAD casero para uso fuera de los tests?
+///
+/// `true` bajo `cargo test` o con `--features didactic_crypto`.
+pub const DIDACTIC_AEAD_ENABLED: bool = cfg!(any(test, feature = "didactic_crypto"));
 
 // ─────────────────────────────────────────────────────────────────────────
 // SHA-256 (FIPS 180-4)
@@ -707,6 +720,10 @@ fn aead_tag(one_time_key: &[u8; 32], aad: &[u8], ciphertext: &[u8]) -> [u8; 16] 
 /// El *nonce* jamás debe repetirse con la misma clave: la unicidad la garantiza
 /// el llamante (el túnel de red usa un contador monótono).
 pub fn aead_seal(key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], plaintext: &[u8]) -> Vec<u8> {
+    if !DIDACTIC_AEAD_ENABLED {
+        let _ = (key, nonce, aad, plaintext);
+        return Vec::new();
+    }
     let one_time_key = poly_one_time_key(key, nonce);
     let mut sealed = plaintext.to_vec();
     chacha20_xor(key, 1, nonce, &mut sealed);
@@ -718,6 +735,10 @@ pub fn aead_seal(key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], plaintext: &[u8])
 /// **Abre** un mensaje sellado. Devuelve `None` si la etiqueta no cuadra:
 /// un solo bit alterado invalida el mensaje completo (inmunidad de integridad).
 pub fn aead_open(key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+    if !DIDACTIC_AEAD_ENABLED {
+        let _ = (key, nonce, aad, sealed);
+        return None;
+    }
     if sealed.len() < AEAD_TAG {
         return None;
     }
@@ -1035,6 +1056,10 @@ pub fn aes128_gcm_seal(
     aad: &[u8],
     plaintext: &[u8],
 ) -> Option<Vec<u8>> {
+    if !DIDACTIC_AEAD_ENABLED {
+        let _ = (key, nonce, aad, plaintext);
+        return None;
+    }
     let (cipher, h, j0) = gcm_setup(key, nonce)?;
     let mut sealed = plaintext.to_vec();
     gcm_stream(&cipher, j0, &mut sealed);
@@ -1049,6 +1074,10 @@ pub fn aes128_gcm_seal(
 /// el contraste recorre los 16 bytes siempre (tiempo constante): un registro
 /// manipulado no filtra por dónde iba bien.
 pub fn aes128_gcm_open(key: &[u8], nonce: &[u8; 12], aad: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+    if !DIDACTIC_AEAD_ENABLED {
+        let _ = (key, nonce, aad, sealed);
+        return None;
+    }
     let (cipher, h, j0) = gcm_setup(key, nonce)?;
     if sealed.len() < GCM_TAG {
         return None;

@@ -30,10 +30,16 @@
 //! *layout* abstracto y cada operación evita una ida y vuelta al núcleo del
 //! sistema operativo. El modelo es determinista y **no toca hardware real**:
 //! la simulación es honesta y auto-contenida (`std` puro).
+//!
+//! **Etiqueta pública:** `DIDACTIC_METAL_IR = true`. No hay Metal/GPU real,
+//! ni MMIO, ni syscalls evitadas de verdad: sólo un IR abstracto para el panel.
 
 use crate::lexer::{Keyword, Token, TokenKind};
 use crate::memory_region::Device;
 use std::collections::BTreeMap;
+
+/// Marcador estable: Metal-IR es simulación didáctica, no un backend de GPU.
+pub const DIDACTIC_METAL_IR: bool = true;
 
 /// Máscara de bits disponibles para el inmediato de una instrucción.
 const IMM_MASK: u32 = 0x07FF;
