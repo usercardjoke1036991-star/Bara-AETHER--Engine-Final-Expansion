@@ -23,9 +23,7 @@ use bara::mesh_sync::{MeshCluster, PeerId};
 use bara::metal_ir::{self, LiveRange, MetalMapper, RegAllocation, RegisterClass};
 use bara::quantum_native::{Amplitude, BellPhase, QuantumNative};
 use bara::repl::Oracle;
-use bara::runtime::{
-    BaraRuntime, ExecutionEvent, QuantumState, MAX_AXIOM_GENERATIONS, MAX_AXIOMS,
-};
+use bara::runtime::{BaraRuntime, ExecutionEvent, QuantumState, MAX_AXIOMS, MAX_AXIOM_GENERATIONS};
 use bara::temporal_rollback::{self, TemporalEngine};
 
 // ─────────────────────────────────────────────────────────────────────────
