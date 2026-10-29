@@ -22,8 +22,14 @@
 //! *binding* formalmente y un único punto de evaluación. Modela el *flujo*
 //! de una verificación en etapa de compilación, que es el objetivo del
 //! stub del AETHER-Ω.
+//!
+//! **Etiqueta pública:** `DIDACTIC_ZK = true`. Ninguna API de este módulo
+//! promete zero-knowledge real ni resistencia a un adversario criptográfico.
 
 use std::ops::{Add, Mul, Sub};
+
+/// Marcador estable para consumidores (IDE, FFI): la puerta ZK es didáctica.
+pub const DIDACTIC_ZK: bool = true;
 
 /// Módulo primo de Mersenne: `2⁶¹ − 1`.
 pub const P: u64 = 2_305_843_009_213_693_951;

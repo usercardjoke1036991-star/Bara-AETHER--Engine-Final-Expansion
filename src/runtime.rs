@@ -238,6 +238,12 @@ pub struct Axiom {
 /// Tope del ledger de mutaciones. Lo viejo se descarta; el núcleo base no se toca.
 pub const LEDGER_LIMIT: usize = 32;
 
+/// Techo de generaciones de axiogénesis (presupuesto de novedad).
+pub const MAX_AXIOM_GENERATIONS: usize = 48;
+
+/// Techo de axiomas vivos distintos (presupuesto de novedad).
+pub const MAX_AXIOMS: usize = 48;
+
 /// Ganancia de atención por cada evaluación de la raíz.
 const ATTEND_GAIN: u32 = 4;
 
@@ -383,6 +389,13 @@ impl AutopoieticMutator {
     /// La generación se incrementa una sola vez por raíz. Una repetición
     /// posterior no crea otro axioma: reduce la masa de falsedad `0.05` por
     /// aparición extra (tope 8) y anota el cambio en el ledger.
+    ///
+    /// **Presupuesto de novedad:** no se crean más de [`MAX_AXIOMS`] axiomas
+    /// ni se supera [`MAX_AXIOM_GENERATIONS`]. Si el reajuste **empeora** la
+    /// valencia (más falsedad y menos verdad), se hace *rollback* al axioma
+    /// previo. Las valencias `Both`/`Neither` del resultado se toleran en el
+    /// ledger semántico, pero la fusión al núcleo (`autopoietic::commit`)
+    /// las veta vía [`crate::autopoietic::BelnapVerdict::admits_fusion`].
     pub fn synthesize(&mut self, root: &str) -> Axiom {
         let repetitions = self.sightings.get(root).copied().unwrap_or(1).max(1);
         let (truth, falsity) = axiom_masses(root, repetitions);
@@ -393,6 +406,11 @@ impl AutopoieticMutator {
             {
                 return existing;
             }
+            // Rollback si el saldo ⊤−⊥ empeora (p. ej. bajar apariciones).
+            let worsens = (truth - falsity) < (current_truth - current_falsity);
+            if worsens {
+                return existing;
+            }
             let updated = Axiom {
                 valence: QuantumState::paraconsistent(truth, falsity),
                 ..existing
@@ -400,6 +418,19 @@ impl AutopoieticMutator {
             self.axioms.insert(root.to_string(), updated.clone());
             self.remember(root, repetitions, truth, falsity);
             return updated;
+        }
+
+        if self.axioms.len() >= MAX_AXIOMS || self.generation >= MAX_AXIOM_GENERATIONS {
+            return Axiom {
+                root: root.to_string(),
+                generation: self.generation,
+                rule: format!(
+                    "⟦{}⟧ ≜ presupuesto agotado (tope {} axiomas / {} generaciones)",
+                    root, MAX_AXIOMS, MAX_AXIOM_GENERATIONS
+                ),
+                // Neither: no se inserta en el mapa; la fusión al núcleo lo vetaría.
+                valence: QuantumState::paraconsistent(0.0, 0.0),
+            };
         }
 
         self.generation += 1;
@@ -420,6 +451,11 @@ impl AutopoieticMutator {
         self.axioms.insert(root.to_string(), axiom.clone());
         self.remember(root, repetitions, truth, falsity);
         axiom
+    }
+
+    /// Número de axiomas vivos (presupuesto consumido).
+    pub fn axiom_count(&self) -> usize {
+        self.axioms.len()
     }
 
     fn remember(&mut self, root: &str, repetitions: u32, truth: f64, falsity: f64) {
@@ -1426,5 +1462,58 @@ mod tests {
         assert_eq!(mutator.ledger_len(), 2);
         assert_eq!(mutator.ledger_last_root(), Some("אבג"));
         assert_eq!(mutator.sightings_total(), 2);
+    }
+
+    fn hebrew_root(index: usize) -> String {
+        // Alef–tav: índices acotados a 22, sin Option/expect (A1 + clippy).
+        const HE: &[char] = &[
+            'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ',
+            'צ', 'ק', 'ר', 'ש', 'ת',
+        ];
+        format!(
+            "{}{}{}",
+            HE[(index / 484) % HE.len()],
+            HE[(index / 22) % HE.len()],
+            HE[index % HE.len()]
+        )
+    }
+
+    #[test]
+    fn el_presupuesto_de_novedad_detiene_la_axiogenesis() {
+        let mut mutator = AutopoieticMutator::new();
+        for i in 0..(MAX_AXIOMS + 8) {
+            let root = hebrew_root(i);
+            mutator.observe(&root);
+            let axiom = mutator.synthesize(&root);
+            if i >= MAX_AXIOMS {
+                assert!(
+                    axiom.rule.contains("presupuesto agotado"),
+                    "debía rechazar novedad en i={i}"
+                );
+                assert!(!mutator.knows(&root));
+            }
+        }
+        assert_eq!(mutator.axiom_count(), MAX_AXIOMS);
+        assert!(mutator.generation() <= MAX_AXIOM_GENERATIONS);
+    }
+
+    #[test]
+    fn el_reajuste_que_empeora_hace_rollback() {
+        let mut mutator = AutopoieticMutator::new();
+        for _ in 0..8 {
+            mutator.observe("שפט");
+        }
+        let best = mutator.synthesize("שפט");
+        let (t_best, f_best) = best.valence.belnap();
+        // Volver a una sola aparición recalcula masas peores → rollback.
+        mutator.sightings.insert("שפט".to_string(), 1);
+        let after = mutator.synthesize("שפט");
+        let (t_after, f_after) = after.valence.belnap();
+        assert_eq!(t_after.to_bits(), t_best.to_bits());
+        assert_eq!(f_after.to_bits(), f_best.to_bits());
+        assert_eq!(
+            mutator.axiom("שפט").map(|a| a.rule.as_str()),
+            Some(best.rule.as_str())
+        );
     }
 }

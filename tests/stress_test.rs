@@ -23,7 +23,7 @@ use bara::mesh_sync::{MeshCluster, PeerId};
 use bara::metal_ir::{self, LiveRange, MetalMapper, RegAllocation, RegisterClass};
 use bara::quantum_native::{Amplitude, BellPhase, QuantumNative};
 use bara::repl::Oracle;
-use bara::runtime::{BaraRuntime, ExecutionEvent, QuantumState};
+use bara::runtime::{BaraRuntime, ExecutionEvent, QuantumState, MAX_AXIOMS, MAX_AXIOM_GENERATIONS};
 use bara::temporal_rollback::{self, TemporalEngine};
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -182,40 +182,40 @@ fn high_frequency_ast_mutation_stays_bounded() {
     let roots: Vec<String> = (0..512).map(|_| random_root(&mut rng)).collect();
 
     // 4 000 invocaciones aleatorias: el lenguaje se reescribe a sí mismo.
+    // Tras el techo de novedad, synthesize devuelve Neither (presupuesto).
     for _ in 0..4_000 {
         let index = rng.below(roots.len());
         let axiom = runtime.mutator.synthesize(&roots[index]);
-        assert!(axiom.valence.is_contradiction(), "todo axioma es ⊤∧⊥");
+        if axiom.rule.contains("presupuesto agotado") {
+            assert!(!axiom.valence.is_contradiction());
+        } else {
+            assert!(axiom.valence.is_contradiction(), "todo axioma vivo es ⊤∧⊥");
+        }
         assert!(state_is_sane(&axiom.valence));
         assert!(!axiom.rule.is_empty());
     }
 
-    // La generación sólo avanza con raíces NUEVAS: acotada por el conjunto.
+    // La generación sólo avanza con raíces NUEVAS: acotada por el presupuesto.
     let generation_after_storm = runtime.mutator.generation();
     assert!(generation_after_storm <= roots.len());
+    assert!(generation_after_storm <= MAX_AXIOM_GENERATIONS);
+    assert!(runtime.mutator.axiom_count() <= MAX_AXIOMS);
 
-    // Sintetizar todo el vocabulario converge a la misma generación que un
-    // runtime gemelo (idempotencia y determinismo del mutador).
-    for root in &roots {
-        runtime.mutator.synthesize(root);
+    // Bajo el techo de novedad, el mismo prefijo de raíces en el mismo orden
+    // produce el mismo punto fijo (idempotencia y determinismo).
+    let capped: Vec<&String> = roots.iter().take(MAX_AXIOMS).collect();
+    let mut left = BaraRuntime::new();
+    let mut right = BaraRuntime::new();
+    for root in &capped {
+        left.mutator.synthesize(root);
+        right.mutator.synthesize(root);
     }
-    let mut twin = BaraRuntime::new();
-    for root in &roots {
-        twin.mutator.synthesize(root);
-    }
+    assert_eq!(left.mutator.generation(), right.mutator.generation());
+    assert_eq!(left.mutator.axiom_count(), MAX_AXIOMS.min(capped.len()));
+    let sample = capped[0];
     assert_eq!(
-        twin.mutator.generation(),
-        runtime.mutator.generation(),
-        "la autopoiesis no depende del orden ni del número de invocaciones"
-    );
-    assert!(runtime.mutator.generation() <= 512);
-    let sample = roots[0].clone();
-    assert_eq!(
-        twin.mutator.axiom(&sample).map(|axiom| axiom.rule.clone()),
-        runtime
-            .mutator
-            .axiom(&sample)
-            .map(|axiom| axiom.rule.clone())
+        left.mutator.axiom(sample).map(|axiom| axiom.rule.clone()),
+        right.mutator.axiom(sample).map(|axiom| axiom.rule.clone())
     );
 
     // La repetición no muta el lenguaje ni acumula entropía.

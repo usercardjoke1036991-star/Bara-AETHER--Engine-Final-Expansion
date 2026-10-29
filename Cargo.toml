@@ -28,6 +28,18 @@ crate-type = ["rlib"]
 [dependencies]
 
 # ─────────────────────────────────────────────────────────────────────────
+# Features didácticas (desactivadas por defecto)
+# ─────────────────────────────────────────────────────────────────────────
+# `didactic_crypto` habilita el *uso* de AEAD casero (AES-128-GCM y
+# ChaCha20-Poly1305) fuera de `cargo test`. Sin la feature, esas APIs
+# rechazan sellar/abrir en builds de producción (stubs). SHA-256 / HMAC /
+# HKDF / X25519 siguen disponibles: no son cifrado de tráfico.
+# Ver `docs/CRYPTO_DIDACTICA.md`.
+[features]
+default = []
+didactic_crypto = []
+
+# ─────────────────────────────────────────────────────────────────────────
 # Perfil de release — máximo rendimiento nativo (AETHER-Ω)
 # ─────────────────────────────────────────────────────────────────────────
 # NO se declara aquí: Cargo sólo admite `[profile.*]` en el manifiesto de la
