@@ -1465,17 +1465,16 @@ mod tests {
     }
 
     fn hebrew_root(index: usize) -> String {
-        let glyph = |offset: usize| -> char {
-            match char::from_u32(0x05D0 + (offset % 22) as u32) {
-                Some(c) => c,
-                None => '\u{05D0}',
-            }
-        };
+        // Alef–tav: índices acotados a 22, sin Option/expect (A1 + clippy).
+        const HE: &[char] = &[
+            'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע',
+            'פ', 'צ', 'ק', 'ר', 'ש', 'ת',
+        ];
         format!(
             "{}{}{}",
-            glyph(index / 484),
-            glyph(index / 22),
-            glyph(index)
+            HE[(index / 484) % HE.len()],
+            HE[(index / 22) % HE.len()],
+            HE[index % HE.len()]
         )
     }
 
