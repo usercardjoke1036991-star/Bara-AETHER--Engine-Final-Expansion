@@ -1465,10 +1465,18 @@ mod tests {
     }
 
     fn hebrew_root(index: usize) -> String {
-        let a = char::from_u32(0x05D0 + ((index / 484) % 22) as u32).expect("he");
-        let b = char::from_u32(0x05D0 + ((index / 22) % 22) as u32).expect("he");
-        let c = char::from_u32(0x05D0 + (index % 22) as u32).expect("he");
-        format!("{a}{b}{c}")
+        let glyph = |offset: usize| -> char {
+            match char::from_u32(0x05D0 + (offset % 22) as u32) {
+                Some(c) => c,
+                None => '\u{05D0}',
+            }
+        };
+        format!(
+            "{}{}{}",
+            glyph(index / 484),
+            glyph(index / 22),
+            glyph(index)
+        )
     }
 
     #[test]
