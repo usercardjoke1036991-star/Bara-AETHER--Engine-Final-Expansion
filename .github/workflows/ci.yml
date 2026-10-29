@@ -3,8 +3,7 @@
 #  CI · Bara (בָּרָא) / AETHER-Ω — Integración continua del kernel
 #
 #  Objetivo: ningún cambio llega a `dev` (y por tanto a `main`) sin pasar la
-#  suite completa —110 pruebas del kernel (59 unitarias + 51 de integración)
-#  más las 34 del motor del IDE: 144 en el workspace— en los perfiles debug y
+#  suite completa del kernel en los perfiles debug y
 #  release, en Linux y Windows, con política estricta de cero advertencias
 #  (`RUSTFLAGS = -D warnings`).
 # ══════════════════════════════════════════════════════════════════════════
@@ -62,13 +61,15 @@ jobs:
           - release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Instalar toolchain oficial de Rust (stable)
-        uses: dtolnay/rust-toolchain@stable
+      - name: Instalar Rust 1.99.0
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: 1.99.0
 
       - name: Caché de registros y de target/
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: ${{ matrix.os }}-${{ matrix.profile }}
 
@@ -83,8 +84,9 @@ jobs:
   # ── Puerta OBLIGATORIA de calidad: clippy + totalidad + rustfmt + perfiles
   #    Los cuatro pasos **bloquean** la fusión:
   #      · clippy    — 0 avisos con `-D warnings`.
-  #      · totalidad — `src/` sin `expect()` ni `unwrap()`: el kernel es total
-  #                    y tolerante, jamás aborta (axioma A1).
+  #      · totalidad — `src/` sin `expect()` ni `unwrap()`, y sin `panic!()` ni
+  #                    `unreachable!()` fuera de `#[cfg(test)]`. El indexado
+  #                    `[]` no entra: en este árbol sería ruido.
   #      · rustfmt   — el reflujo de `cargo fmt` ya está asentado, así que la
   #                    comprobación dejó de ser informativa.
   #      · perfiles  — el perfil release del kernel vive en
@@ -97,15 +99,16 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Instalar toolchain oficial de Rust (stable) con componentes
-        uses: dtolnay/rust-toolchain@stable
+      - name: Instalar Rust 1.99.0 con componentes
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
+          toolchain: 1.99.0
           components: clippy, rustfmt
 
       - name: Caché de registros y de target/
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: ubuntu-latest-lints
 
@@ -119,6 +122,7 @@ jobs:
             exit 1
           fi
           echo 'OK: src/ sin expect() ni unwrap(); el kernel no puede abortar.'
+          python3 scripts/check_totality.py
 
       - name: cargo fmt --all --check (bloqueante)
         run: cargo fmt --all --check

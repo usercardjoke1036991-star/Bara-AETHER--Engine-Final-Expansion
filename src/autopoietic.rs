@@ -3061,6 +3061,16 @@ impl AutopoieticMutator {
         self.link.gateway().counters().rejected
     }
 
+    /// Anota un peso de atención en el log. No escribe en el núcleo.
+    pub fn note_attention(&mut self, fingerprint: u64, weight: u32) {
+        self.log(format!("atencion fp={fingerprint:016x} peso={weight}"));
+    }
+
+    /// Anota un patrón de repetición en el log. No escribe en el núcleo.
+    pub fn note_repetition(&mut self, fingerprint: u64, repetitions: u32) {
+        self.log(format!("repeticion fp={fingerprint:016x} n={repetitions}"));
+    }
+
     /// Anota una entrada en el log ontológico, respetando [`JOURNAL_LIMIT`].
     fn log(&mut self, entry: String) {
         if self.journal.len() >= JOURNAL_LIMIT {
@@ -3438,6 +3448,18 @@ mod tests {
     use super::*;
     /// Semilla soberana de las pruebas (determinista: sin aleatoriedad real).
     const SEED: &[u8] = b"bara:pruebas:autopoiesis:v1";
+
+    #[test]
+    fn anotar_una_repeticion_no_escribe_en_el_nucleo() {
+        let mut mutator = AutopoieticMutator::new(SEED);
+        let before = mutator.counters();
+        mutator.note_repetition(0xabc, 3);
+        assert_eq!(
+            mutator.journal_tail(),
+            Some("repeticion fp=0000000000000abc n=3")
+        );
+        assert_eq!(mutator.counters(), before);
+    }
 
     /// Nodo *Shoresh* con valencia `(verdad, falsedad)` explícita.
     fn node(root: &str, arity: usize, hazard: f64, truth: f64, falsity: f64) -> ShoreshNode {

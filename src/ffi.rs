@@ -44,12 +44,13 @@
 //! dinámica por el tamaño que declare el llamante.
 //!
 //! ## Compilación para `aarch64-linux-android`
-//! `Cargo.toml` declara `crate-type = ["rlib", "cdylib"]`, así que
-//! `cargo build --release --target aarch64-linux-android` produce
-//! `libbara.so` con el perfil soberano (`opt-level = 3`, `lto = true`,
-//! `codegen-units = 1`, `panic = "abort"`). El guion
-//! `scripts/build_android.ps1` automatiza la compilación y el copiado a
-//! `dist/android/<abi>/`.
+//! El target del núcleo es sólo `rlib`. Un `cdylib` junto al binario `bara`
+//! choca los nombres de salida en MSVC cuando el perfil release lleva LTO, y
+//! `link.exe` no llega a enlazar la rlib. La biblioteca compartida se emite
+//! en una invocación aparte, con el mismo perfil soberano (`opt-level = 3`,
+//! `lto = true`, `codegen-units = 1`, `panic = "abort"`):
+//! `cargo rustc --release --target aarch64-linux-android --lib --crate-type cdylib`
+//! produce `libbara.so` con los símbolos `bara_ffi_*`.
 
 // Sin `#![forbid(unsafe_code)]`: `#[no_mangle]` es un atributo clasificado como
 // `unsafe` desde Rust 1.82. El permiso lo concede `lib.rs` a este módulo y aquí

@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! # Bara — Oráculo en vivo (`bara_oracle`)
 //!
 //! Binario dedicado a la **manifestación interactiva**. A diferencia de `bara`

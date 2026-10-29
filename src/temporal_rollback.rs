@@ -112,6 +112,32 @@ pub fn detect_paradox(state: &QuantumState) -> Option<Paradox> {
     }
 }
 
+/// Tope del ledger de resoluciones. Lo viejo se descarta; el reloj no entra.
+pub const RESOLUTION_LIMIT: usize = 32;
+
+/// Quién cerró la contradicción.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolutionOrigin {
+    /// El juicio `שפט` (conjunción) sacó el estado de `⊤∧⊥`.
+    Judge,
+    /// El operador confirmó el patrón a mano.
+    User,
+}
+
+/// Rastro determinista de una contradicción ya resuelta.
+///
+/// No lleva marca de reloj: dos ejecuciones con los mismos juicios producen
+/// el mismo ledger.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolutionTrace {
+    /// Patrón corto (`B*F`) o raíz que cupo en el optimizador.
+    pub pattern: String,
+    /// Origen de la resolución.
+    pub origin: ResolutionOrigin,
+    /// `true` si la corrección fue un sello; `false` si fue una separación.
+    pub seal: bool,
+}
+
 /// Motor de navegación temporal: pila de estados + diario de deltas.
 #[derive(Debug, Clone)]
 pub struct TemporalEngine {
@@ -121,6 +147,8 @@ pub struct TemporalEngine {
     stack: Vec<QuantumState>,
     deltas: Vec<Delta>,
     next_id: u64,
+    /// Resoluciones de `⊤∧⊥`. Este diario no consulta `epoch`.
+    resolutions: Vec<ResolutionTrace>,
 }
 
 impl Default for TemporalEngine {
@@ -130,6 +158,7 @@ impl Default for TemporalEngine {
             stack: Vec::new(),
             deltas: Vec::new(),
             next_id: 0,
+            resolutions: Vec::new(),
         }
     }
 }
@@ -153,6 +182,24 @@ impl TemporalEngine {
     /// Diario completo de deltas (incluidos los revertidos).
     pub fn deltas(&self) -> &[Delta] {
         &self.deltas
+    }
+
+    /// Resoluciones de contradicción, de la más antigua a la más reciente.
+    pub fn resolutions(&self) -> &[ResolutionTrace] {
+        &self.resolutions
+    }
+
+    /// Cuántas resoluciones siguen en el ledger.
+    pub fn resolution_len(&self) -> usize {
+        self.resolutions.len()
+    }
+
+    /// Anota una resolución. Al pasar de [`RESOLUTION_LIMIT`] cae la más antigua.
+    pub fn record_resolution(&mut self, trace: ResolutionTrace) {
+        if self.resolutions.len() >= RESOLUTION_LIMIT {
+            self.resolutions.remove(0);
+        }
+        self.resolutions.push(trace);
     }
 
     /// Marca lógica del instante actual.

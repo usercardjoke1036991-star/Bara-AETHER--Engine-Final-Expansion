@@ -16,8 +16,8 @@ de explotar.
 |---|---|
 | `cargo build` (debug) | EXIT 0 · **0 advertencias** |
 | `cargo build --release` | EXIT 0 · `opt-level=3`, `lto=true`, `codegen-units=1`, `panic="abort"` |
-| `cargo test` | **110 / 110** en el crate `bara` · **144 / 144** en el workspace (con `bara-ide`) · 0 advertencias · clippy limpio (`-D warnings`) |
-| `cargo test --release` | **110 / 110** · integración 0.01 s + estrés 0.51 s |
+| `cargo test` | el job de CI (`cargo test --all-targets --locked`, debug y release) · clippy `-D warnings` |
+| `cargo test --release` | el mismo job, perfil release |
 | Dependencias externas | **0** (`Cargo.lock` contiene sólo `bara`) |
 | `unsafe` | **0** (`#![forbid(unsafe_code)]` en `src/lib.rs`) |
 
@@ -80,15 +80,16 @@ ADN. Todos nacen con **0 dependencias**, **0 `unsafe`** y sin una sola llamada a
 5. **`net_camouflage`** — cliente **TLS 1.3** escrito desde cero sobre `std` cuyo
    azar sale del ADN y no del sistema operativo: el saludo lleva el relleno exacto
    del umbral de 512 B, la huella es estable para todo el enjambre y la **marca**
-   viaja en el `session_id` (material aleatorio legítimo) para que cualquier par
-   la verifique en tiempo constante.
+   viaja en el `session_id` para que un par Bara la verifique. No valida
+   certificados de la web pública y no hay secreto hacia adelante: no es un
+   cliente HTTPS general.
 
 ### Verificación de la capa
 
 | Suite | Resultado |
 |---|---|
-| `cargo test` (crate `bara`) | **110 / 110** — 59 unitarias + 51 de integración (áureas 8 · integración 33 · estrés 10) |
-| `cargo test --workspace` | **144 / 144** — incluye las 34 de `bara-ide` |
+| `cargo test` (crate `bara`) | la imprime el job de CI de este repositorio |
+| `cargo test --workspace` | sólo en la máquina de desarrollo, donde existe el workspace padre; este repo no contiene el IDE |
 | Pruebas nuevas | **31** (`crypto_native` 12 · `immunity_gateway` 8 · `net_camouflage` 11) |
 | `cargo clippy --all-targets --workspace -- -D warnings` | EXIT 0 · **0 avisos** |
 | `cargo fmt --all -- --check` | EXIT 0 · **sin diferencias** |
@@ -201,10 +202,12 @@ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
 cargo run --release --bin bara_oracle -- --bare --no-live -s "ברא שמר עבד"
 
 # El manifiesto también puede llegar por stdin (`-`)
+# Windows:
 type manifests\shoresh_manifest.bara | cargo run --release --bin bara_oracle -- --no-live -
+# POSIX:
+# cargo run --release --bin bara_oracle -- --no-live - < manifests/shoresh_manifest.bara
 
-# Suite completa: 175 unitarias + 71 de integración
-# (246 en el crate `bara`; 286 en el workspace, con las 40 de `bara-ide`)
+# La cifra de pruebas la imprime el propio `cargo test` y el job de CI.
 cargo test
 cargo test --release -- --nocapture
 ```
@@ -315,11 +318,13 @@ $ cargo run --release --bin bara_oracle -- manifests/shoresh_manifest.bara
 
 Los *tests* enlazan el mismo *kernel* (`use bara::…`), por lo que no hay copias
 divergentes de los tipos: lo que pasa en las pruebas es lo que ejecuta el binario.
-A esas **71** pruebas de integración se suman las **175 unitarias** de `src/**`
-—léxico, runtime, memoria regional, ZK, cripto nativa contra los vectores de sus
-RFC, ADN firmado, emisión WASM/ELF64, puerta de inmunidad, camuflaje TLS, ingesta
-FFI, geometría áurea y constructor visual—, para un total de **246** en el crate
-`bara` (**286** en el workspace, con las **40** de `bara-ide`).
+A esas pruebas de integración se suman las unitarias de `src/**`
+—léxico, runtime, memoria regional, la simulación didáctica de ZK, cripto nativa
+contra los vectores de sus RFC, ADN firmado, emisión WASM/ELF64, puerta de
+inmunidad, camuflaje TLS (no es un cliente de la web pública), ingesta FFI,
+geometría áurea y constructor visual—. El total lo imprime `cargo test -p bara`;
+no se copia aquí para no dejarlo atrasado. El crate del IDE no forma parte de
+este repositorio.
 
 ### Banco de metal y caos (fase de integración 6)
 

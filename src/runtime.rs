@@ -15,12 +15,13 @@
 
 use crate::ffi_ingest::{self, IngestedDecl, ShoreshNode};
 use crate::fractal_geometry::FractalLayout;
+use crate::inference::RuleOptimizer;
 use crate::lexer::{Keyword, Token, TokenKind};
 use crate::memory_region::{Device, RegionKind, RegionTable};
 use crate::mesh_sync::{MeshCluster, SyncReport};
 use crate::metal_ir::{MetalMapper, MetalProgram};
 use crate::quantum_native::{Amplitude, BellPhase, QuantumNative};
-use crate::temporal_rollback::{self, TemporalEngine};
+use crate::temporal_rollback::{self, ResolutionOrigin, ResolutionTrace, TemporalEngine};
 use crate::zk_proof::{ConstraintSystem, ZkCertificate};
 use std::collections::BTreeMap;
 
@@ -234,15 +235,51 @@ pub struct Axiom {
     pub valence: QuantumState,
 }
 
+/// Tope del ledger de mutaciones. Lo viejo se descarta; el núcleo base no se toca.
+pub const LEDGER_LIMIT: usize = 32;
+
+/// Ganancia de atención por cada evaluación de la raíz.
+const ATTEND_GAIN: u32 = 4;
+
+/// Decaimiento de las demás raíces en esa misma evaluación.
+const ATTEND_DECAY: u32 = 1;
+
+/// Techo del peso de atención. El refuerzo no desborda.
+const ATTENTION_CAP: u32 = 1024;
+
+/// Anotación determinista de una síntesis o un reajuste de pesos.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutationEntry {
+    /// Raíz que mutó.
+    pub root: String,
+    /// Generación del axioma (no avanza en un reajuste).
+    pub generation: usize,
+    /// Apariciones de la raíz en el AST ya observadas.
+    pub repetitions: u32,
+    /// Bits de la masa de verdad tras el ajuste.
+    pub truth_bits: u64,
+    /// Bits de la masa de falsedad tras el ajuste.
+    pub falsity_bits: u64,
+}
+
 /// Motor autopoiético: el lenguaje se reescribe a sí mismo.
 ///
 /// Cuando el evaluador encuentra una raíz que no reconoce, no aborta:
 /// invoca [`AutopoieticMutator::synthesize`], que **inventa** un axioma
 /// determinista pero nuevo a partir de los puntos de código de la raíz.
+/// Las repeticiones posteriores no crean otro axioma: bajan la falsedad y
+/// dejan constancia en el ledger. El núcleo inmutable (`KernelCore`) no
+/// tiene una escritura aquí.
 #[derive(Debug, Clone, Default)]
 pub struct AutopoieticMutator {
     generation: usize,
     axioms: BTreeMap<String, Axiom>,
+    /// Apariciones de cada raíz desconocida, en orden de clave.
+    sightings: BTreeMap<String, u32>,
+    /// Historial acotado de síntesis y reajustes.
+    ledger: Vec<MutationEntry>,
+    /// Atención acumulada por raíz. El decaimiento es por evaluación, no por reloj.
+    attention: BTreeMap<String, u32>,
 }
 
 impl AutopoieticMutator {
@@ -271,18 +308,102 @@ impl AutopoieticMutator {
         self.axioms.values()
     }
 
-    /// Sintetiza (o recupera) el axioma de una raíz desconocida.
+    /// Cuenta una aparición de la raíz en el AST. No sintetiza.
+    pub fn observe(&mut self, root: &str) -> u32 {
+        let count = self.sightings.entry(root.to_string()).or_insert(0);
+        *count = count.saturating_add(1);
+        *count
+    }
+
+    /// Suma de apariciones registradas.
+    pub fn sightings_total(&self) -> u32 {
+        self.sightings
+            .values()
+            .copied()
+            .fold(0, u32::saturating_add)
+    }
+
+    /// Entradas vivas del ledger.
+    pub fn ledger_len(&self) -> usize {
+        self.ledger.len()
+    }
+
+    /// Raíz de la última mutación, si hubo alguna.
+    pub fn ledger_last_root(&self) -> Option<&str> {
+        self.ledger.last().map(|entry| entry.root.as_str())
+    }
+
+    /// Refuerza `root` y decae el resto. El peso nace en la evaluación, no en el reloj.
+    pub fn attend(&mut self, root: &str) -> u32 {
+        let stale: Vec<String> = self
+            .attention
+            .keys()
+            .filter(|key| key.as_str() != root)
+            .cloned()
+            .collect();
+        for key in stale {
+            if let Some(weight) = self.attention.get_mut(&key) {
+                *weight = weight.saturating_sub(ATTEND_DECAY);
+            }
+        }
+        let weight = self.attention.entry(root.to_string()).or_insert(0);
+        *weight = weight.saturating_add(ATTEND_GAIN).min(ATTENTION_CAP);
+        *weight
+    }
+
+    /// Peso de atención de una raíz. Cero si nunca se evaluó.
+    pub fn attention_of(&self, root: &str) -> u32 {
+        self.attention.get(root).copied().unwrap_or(0)
+    }
+
+    /// Suma de los pesos vivos.
+    pub fn attention_total(&self) -> u32 {
+        self.attention
+            .values()
+            .copied()
+            .fold(0, u32::saturating_add)
+    }
+
+    /// Mayor peso vivo.
+    pub fn attention_peak(&self) -> u32 {
+        self.attention.values().copied().max().unwrap_or(0)
+    }
+
+    /// Raíz prioritaria: mayor peso y, en empate, la clave menor.
+    pub fn priority_root(&self) -> Option<&str> {
+        self.attention
+            .iter()
+            .filter(|(_, weight)| **weight > 0)
+            .max_by(|left, right| left.1.cmp(right.1).then_with(|| right.0.cmp(left.0)))
+            .map(|(root, _)| root.as_str())
+    }
+
+    /// Sintetiza (o reajusta) el axioma de una raíz desconocida.
     ///
-    /// La generación se incrementa una sola vez por raíz: la síntesis es
-    /// idempotente, coherente con el principio de entropía cero.
+    /// La generación se incrementa una sola vez por raíz. Una repetición
+    /// posterior no crea otro axioma: reduce la masa de falsedad `0.05` por
+    /// aparición extra (tope 8) y anota el cambio en el ledger.
     pub fn synthesize(&mut self, root: &str) -> Axiom {
-        if let Some(existing) = self.axioms.get(root) {
-            return existing.clone();
+        let repetitions = self.sightings.get(root).copied().unwrap_or(1).max(1);
+        let (truth, falsity) = axiom_masses(root, repetitions);
+        if let Some(existing) = self.axioms.get(root).cloned() {
+            let (current_truth, current_falsity) = existing.valence.belnap();
+            if current_truth.to_bits() == truth.to_bits()
+                && current_falsity.to_bits() == falsity.to_bits()
+            {
+                return existing;
+            }
+            let updated = Axiom {
+                valence: QuantumState::paraconsistent(truth, falsity),
+                ..existing
+            };
+            self.axioms.insert(root.to_string(), updated.clone());
+            self.remember(root, repetitions, truth, falsity);
+            return updated;
         }
 
         self.generation += 1;
         let seed = fnv1a(root);
-
         let modality = ["⊤-estable", "⊥-disolvente", "⊤⊢⊥ metaestable"][(seed % 3) as usize];
         let invariant = [
             "(x ∧ ¬x) → x",
@@ -290,9 +411,6 @@ impl AutopoieticMutator {
             "(x → y) → (¬y → ¬x)",
             "◇x ∧ □¬x → ⊥",
         ][((seed >> 3) % 4) as usize];
-        let truth = 0.5 + ((seed >> 7) % 50) as f64 / 100.0;
-        let falsity = 0.5 + ((seed >> 11) % 50) as f64 / 100.0;
-
         let axiom = Axiom {
             root: root.to_string(),
             generation: self.generation,
@@ -300,7 +418,21 @@ impl AutopoieticMutator {
             valence: QuantumState::paraconsistent(truth, falsity),
         };
         self.axioms.insert(root.to_string(), axiom.clone());
+        self.remember(root, repetitions, truth, falsity);
         axiom
+    }
+
+    fn remember(&mut self, root: &str, repetitions: u32, truth: f64, falsity: f64) {
+        if self.ledger.len() >= LEDGER_LIMIT {
+            self.ledger.remove(0);
+        }
+        self.ledger.push(MutationEntry {
+            root: root.to_string(),
+            generation: self.generation,
+            repetitions,
+            truth_bits: truth.to_bits(),
+            falsity_bits: falsity.to_bits(),
+        });
     }
 }
 
@@ -760,6 +892,8 @@ pub struct BaraRuntime {
     pub mesh: MeshCluster,
     /// Último programa Metal-IR emitido (bypass del driver).
     pub metal: Option<MetalProgram>,
+    /// Pesos de inferencia aprendidos de contradicciones ya resueltas.
+    pub correction: RuleOptimizer,
     log: Vec<ExecutionEvent>,
 }
 
@@ -1079,8 +1213,10 @@ impl BaraRuntime {
                     .unwrap_or_else(|| "<pila vacía>".to_string());
                 self.record(ExecutionEvent::Emit { text });
             }
-            Some(Keyword::Judge) => self.binary(false),
+            Some(Keyword::Judge) => self.judge(),
             None => {
+                let _ = self.mutator.observe(letters);
+                let _ = self.mutator.attend(letters);
                 let axiom = self.mutator.synthesize(letters);
                 let valence = axiom.valence.clone();
                 self.record(ExecutionEvent::Axiogenesis { axiom });
@@ -1105,6 +1241,60 @@ impl BaraRuntime {
         }
     }
 
+    /// Juicio `שפט`: conjunción. Si un operando era `⊤∧⊥` y el resultado ya no,
+    /// el patrón queda en el ledger temporal y en el optimizador.
+    fn judge(&mut self) {
+        let right = self.pop();
+        let left = self.pop();
+        match (left, right) {
+            (Some(left), Some(right)) => {
+                let contradictory =
+                    left.observe() == Observation::Both || right.observe() == Observation::Both;
+                let state = left.conjunction(&right);
+                if contradictory && state.observe() != Observation::Both {
+                    let pattern = format!(
+                        "{}*{}",
+                        observation_token(left.observe()),
+                        observation_token(right.observe())
+                    );
+                    self.timeline.record_resolution(ResolutionTrace {
+                        pattern: pattern.clone(),
+                        origin: ResolutionOrigin::Judge,
+                        seal: false,
+                    });
+                    self.correction.absorb(&pattern, false);
+                }
+                self.record(ExecutionEvent::Fold {
+                    state: state.clone(),
+                });
+                self.push(state);
+            }
+            (left, right) => self.restore_operands(left, right),
+        }
+    }
+
+    /// El operador confirma un patrón. No reescribe los axiomas ni la generación.
+    pub fn accept_resolution(&mut self, root: &str, seal: bool) {
+        self.timeline.record_resolution(ResolutionTrace {
+            pattern: root.to_string(),
+            origin: ResolutionOrigin::User,
+            seal,
+        });
+        self.correction.absorb(root, seal);
+    }
+
+    fn restore_operands(&mut self, left: Option<QuantumState>, right: Option<QuantumState>) {
+        if let Some(left) = left {
+            self.push(left);
+        }
+        if let Some(right) = right {
+            self.push(right);
+        }
+        self.record(ExecutionEvent::Tolerated {
+            reason: "operación binaria con operandos insuficientes (tolerado)".to_string(),
+        });
+    }
+
     /// Aplica una operación binaria paraconsistente sobre los dos estados
     /// superiores de la pila.
     fn binary(&mut self, disjunction: bool) {
@@ -1122,17 +1312,7 @@ impl BaraRuntime {
                 });
                 self.push(state);
             }
-            (a, b) => {
-                if let Some(a) = a {
-                    self.push(a);
-                }
-                if let Some(b) = b {
-                    self.push(b);
-                }
-                self.record(ExecutionEvent::Tolerated {
-                    reason: "operación binaria con operandos insuficientes (tolerado)".to_string(),
-                });
-            }
+            (left, right) => self.restore_operands(left, right),
         }
     }
 
@@ -1183,6 +1363,25 @@ fn clamp01(x: f64) -> f64 {
     x.clamp(0.0, 1.0)
 }
 
+/// Masas de un axioma. La semilla FNV fija el par base en `[0.5, 1)`.
+/// Cada repetición extra resta `0.05` a la falsedad, con tope de 8 pasos.
+fn observation_token(observation: Observation) -> char {
+    match observation {
+        Observation::True => 'T',
+        Observation::False => 'F',
+        Observation::Both => 'B',
+        Observation::Neither => 'N',
+    }
+}
+
+fn axiom_masses(root: &str, repetitions: u32) -> (f64, f64) {
+    let seed = fnv1a(root);
+    let truth = 0.5 + ((seed >> 7) % 50) as f64 / 100.0;
+    let falsity = 0.5 + ((seed >> 11) % 50) as f64 / 100.0;
+    let extra = repetitions.saturating_sub(1).min(8) as f64;
+    (truth, (falsity - extra * 0.05).clamp(0.0, 1.0))
+}
+
 /// Hash FNV-1a de 64 bits. Determinista y sin dependencias externas.
 fn fnv1a(s: &str) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
@@ -1200,4 +1399,32 @@ fn fnv1a(s: &str) -> u64 {
 fn affinity_to_hologram(key: u64) -> f64 {
     let hamming = (key ^ HOLOGRAPHIC_REFERENCE).count_ones();
     1.0 - (hamming as f64) / 64.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn la_repeticion_baja_la_falsedad_y_queda_en_el_ledger() {
+        let mut mutator = AutopoieticMutator::new();
+        assert_eq!(mutator.observe("אבג"), 1);
+        let first = mutator.synthesize("אבג");
+        let (_, falsity) = first.valence.belnap();
+        assert_eq!(mutator.ledger_len(), 1);
+        assert_eq!(mutator.generation(), 1);
+
+        assert_eq!(mutator.observe("אבג"), 2);
+        let second = mutator.synthesize("אבג");
+        let (_, falsity_again) = second.valence.belnap();
+        assert!(falsity_again < falsity);
+        assert_eq!(
+            mutator.generation(),
+            1,
+            "una repetición no crea otro axioma"
+        );
+        assert_eq!(mutator.ledger_len(), 2);
+        assert_eq!(mutator.ledger_last_root(), Some("אבג"));
+        assert_eq!(mutator.sightings_total(), 2);
+    }
 }

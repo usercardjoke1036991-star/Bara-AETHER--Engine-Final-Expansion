@@ -26,8 +26,10 @@
 //!    exactamente [`CACHE_LINE`] bytes, no derramar dentro de la capacidad y
 //!    costar **por nodo** lo mismo a 32 que a 1024 nodos (sin crecimiento
 //!    superlineal). La concurrencia se valida con `std::thread::scope`: todos
-//!    los hilos deben producir el **mismo digest** (determinismo) y no degradar
-//!    el coste por nodo más de [`CONCURRENCY_CEILING`].
+//!    los hilos deben producir el **mismo digest** (determinismo). El coste por
+//!    nodo es la mediana del hilo más lento, tomada cuando el hilo ya está en
+//!    marcha: el arranque no entra en la cuenta, y un pico del planificador no
+//!    tumba la mediana. Esa mediana no puede pasar de [`CONCURRENCY_CEILING`].
 //! 3. **Perfiles de release** — se leen los dos manifiestos que declaran el
 //!    perfil extremo (`BAR/.cargo/config.toml` y, si existe, el del workspace
 //!    contenedor) y se exige que ambos digan lo mismo: `opt-level = 3`,
@@ -822,63 +824,86 @@ fn bench_topology(sheet: &mut Sheet, samples: usize, ops: u32) {
 
 /// Concurrencia: cada hilo contrae el mismo bloque por su cuenta. El digest es
 /// la prueba de que no hay estado compartido ni entrelazado invisible.
-fn bench_concurrency(sheet: &mut Sheet, threads: usize, blocks: usize) {
+///
+/// El reloj arranca dentro del hilo, después de un calentamiento. Así el coste
+/// de crear el hilo —fijo, y enorme frente a 4 sobres en un runner de dos
+/// núcleos— no se cuela en los ns/nodo. Varias rondas y la mediana dejan fuera
+/// un solo pico del planificador.
+fn bench_concurrency(sheet: &mut Sheet, threads: usize, blocks: usize, rounds: usize) {
     sheet.header("Tzimtzum · concurrencia de nodos (mismo digest, sin degradación)");
     let base = nodos(ROW_CAPACITY * LANES);
     let reference = contract(&base, 7).1;
+    let per_block = base.len().max(1);
+    let blocks_u32 = u32::try_from(blocks).unwrap_or(u32::MAX);
 
-    black_box(contract(&base, 7));
-    let serial_start = Instant::now();
-    for _ in 0..blocks {
-        black_box(contract(&base, 7));
-    }
-    let serial_ns = serial_start.elapsed().as_nanos() as f64 / (blocks * base.len()) as f64;
-
-    let start = Instant::now();
-    let digests = std::thread::scope(|scope| {
-        let mut handles = Vec::with_capacity(threads);
-        for _ in 0..threads {
-            handles.push(scope.spawn(|| {
-                let mut digest = [0_u8; 32];
-                for _ in 0..blocks {
-                    let (block, stats) = contract(&base, 7);
-                    digest = stats.digest;
-                    black_box(block);
-                }
-                digest
-            }));
-        }
-        handles
-            .into_iter()
-            .filter_map(|handle| handle.join().ok())
-            .collect::<Vec<[u8; 32]>>()
+    let serial = batch(rounds, blocks_u32, || {
+        black_box(contract(black_box(&base), 7));
     });
-    let parallel_ns = start.elapsed().as_nanos() as f64 / (threads * blocks * base.len()) as f64;
 
+    let mut joined = rounds > 0;
+    let mut same = rounds > 0;
+    let mut slowest = Vec::with_capacity(rounds);
+    for _ in 0..rounds {
+        let round = std::thread::scope(|scope| {
+            let mut handles = Vec::with_capacity(threads);
+            for _ in 0..threads {
+                handles.push(scope.spawn(|| {
+                    black_box(contract(&base, 7));
+                    let start = Instant::now();
+                    let mut digest = [0_u8; 32];
+                    for _ in 0..blocks {
+                        let (block, stats) = contract(&base, 7);
+                        digest = stats.digest;
+                        black_box(block);
+                    }
+                    let nodes = blocks.max(1).saturating_mul(per_block);
+                    let ns_per_node = start.elapsed().as_nanos() as f64 / nodes as f64;
+                    (digest, ns_per_node)
+                }));
+            }
+            handles
+                .into_iter()
+                .filter_map(|handle| handle.join().ok())
+                .collect::<Vec<([u8; 32], f64)>>()
+        });
+        joined &= round.len() == threads;
+        same &= round.iter().all(|(digest, _)| *digest == reference.digest);
+        let mut peak = 0.0_f64;
+        let mut saw = false;
+        for (_, ns) in &round {
+            if !saw || *ns > peak {
+                peak = *ns;
+                saw = true;
+            }
+        }
+        if saw {
+            slowest.push(peak);
+        }
+    }
+
+    sheet.require(joined, "un hilo del banco terminó sin digest (¿pánico?)");
     sheet.require(
-        digests.len() == threads,
-        "un hilo del banco terminó sin digest (¿pánico?)",
-    );
-    sheet.require(
-        digests.iter().all(|digest| *digest == reference.digest),
+        same,
         "los hilos no produjeron el mismo digest: hay estado compartido",
     );
-    sheet.require(
-        parallel_ns <= serial_ns * CONCURRENCY_CEILING,
-        "la concurrencia degradó el coste por nodo más de lo admitido",
-    );
+
+    match (serial, Stats::new(slowest)) {
+        (Some(serial), Some(parallel)) => {
+            let serial_ns = serial.p50() / per_block as f64;
+            let parallel_ns = parallel.p50();
+            sheet.require(
+                serial_ns > 0.0 && parallel_ns <= serial_ns * CONCURRENCY_CEILING,
+                "la concurrencia degradó el coste por nodo más de lo admitido",
+            );
+            println!(
+                "  {threads} hilos × {blocks} sobres · {rounds} rondas · {serial_ns:.3} ns/nodo en serie · {parallel_ns:.3} ns/nodo en paralelo"
+            );
+        }
+        _ => sheet.require(false, "concurrencia: sin muestras"),
+    }
     println!(
-        "  {threads} hilos × {blocks} sobres · {serial_ns:.3} ns/nodo en serie · {parallel_ns:.3} ns/nodo en paralelo"
-    );
-    println!(
-        "  digest común {}",
-        digests
-            .first()
-            .map(|digest| format!(
-                "{:02x}{:02x}{:02x}{:02x}",
-                digest[0], digest[1], digest[2], digest[3]
-            ))
-            .unwrap_or_else(|| "sin digest".to_string())
+        "  digest común {:02x}{:02x}{:02x}{:02x}",
+        reference.digest[0], reference.digest[1], reference.digest[2], reference.digest[3]
     );
 }
 
@@ -986,7 +1011,7 @@ fn main() -> ExitCode {
     bench_immune(&mut sheet, samples);
     bench_belnap(&mut sheet, samples, ops);
     bench_topology(&mut sheet, samples, ops);
-    bench_concurrency(&mut sheet, 4, if bench_mode { 64 } else { 4 });
+    bench_concurrency(&mut sheet, 4, if bench_mode { 64 } else { 4 }, samples);
     bench_kernel(&mut sheet, samples);
     bench_sandbox(&mut sheet, samples);
     sheet.summary();
