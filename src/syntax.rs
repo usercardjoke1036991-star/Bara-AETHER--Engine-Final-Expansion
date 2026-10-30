@@ -219,14 +219,70 @@ pub fn parse(language: SourceLanguage, source: &str) -> SyntaxTree {
     }
 }
 
+/// Motivo por el que el léxico *Shoresh* no verifica un parche.
+///
+/// `None` significa que el lexer no encontró raíces desconocidas ni signos
+/// ajenos al alfabeto que reconoce el kernel. Una raíz autopoiética o un
+/// símbolo fuera del operadorium dejan el parche como «propuesta no verificada».
+pub fn shoresh_unverified_reason(patch: &str) -> Option<String> {
+    use crate::lexer::{Lexer, TokenKind};
+
+    let tokens = Lexer::new(patch).tokenize();
+    let mut unknown_roots: Vec<String> = Vec::new();
+    let mut odd_symbols: Vec<char> = Vec::new();
+    let mut saw_root = false;
+
+    for token in tokens {
+        match token.kind {
+            TokenKind::Root { letters, keyword } => {
+                saw_root = true;
+                if keyword.is_none() {
+                    unknown_roots.push(letters);
+                }
+            }
+            // Signos que el lexer conserva sin juicio: no forman parte de la
+            // sintaxis *Shoresh* reconocida (operadores tipados arriba).
+            TokenKind::Punct(symbol) => {
+                if !odd_symbols.contains(&symbol) {
+                    odd_symbols.push(symbol);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if !unknown_roots.is_empty() {
+        return Some(format!(
+            "propuesta no verificada: raíces desconocidas ({})",
+            unknown_roots.join(", ")
+        ));
+    }
+    // Sólo cuando el bloque habla Shoresh (hay raíces) los signos sueltos
+    // cuentan: un parche Rust/ASCII puro no se marca por `{` o `(`.
+    if saw_root && !odd_symbols.is_empty() {
+        let list: String = odd_symbols.iter().map(|ch| ch.to_string()).collect::<Vec<_>>().join(" ");
+        return Some(format!(
+            "propuesta no verificada: símbolos no reconocidos por el lexer ({list})"
+        ));
+    }
+    None
+}
+
 /// Juicio del bloque que el modo autónomo quiere escribir.
 ///
-/// `∅` es un parche equilibrado que no redeclara un nombre ya presente.
-/// `⊤∧⊥` es un desequilibrio o un nombre que ya existe. `⊥` es un bloque vacío:
-/// no hay hecho que escribir. Las llamadas no cuentan como declaración.
+/// - `⊥` — bloque vacío: no hay hecho que escribir.
+/// - `⊤∧⊥` — desequilibrio o un nombre que ya existe.
+/// - `∅` — falta información o el léxico no verifica el texto (raíces o
+///   símbolos desconocidos): **nunca** debe aplicarse en automático.
+/// - `⊤` — parche equilibrado, sin choque de nombres y léxico verificado.
+///
+/// Las llamadas no cuentan como declaración.
 pub fn judge_patch(language: SourceLanguage, host: &str, patch: &str) -> BelnapValue {
     if patch.trim().is_empty() {
         return BelnapValue::False;
+    }
+    if shoresh_unverified_reason(patch).is_some() {
+        return BelnapValue::Neither;
     }
     let incoming = parse(language, patch);
     if !incoming.balanced {
@@ -242,7 +298,7 @@ pub fn judge_patch(language: SourceLanguage, host: &str, patch: &str) -> BelnapV
         }
         seen.push(name);
     }
-    BelnapValue::Neither
+    BelnapValue::True
 }
 
 fn declarations(tree: &SyntaxTree) -> Vec<String> {
@@ -1705,10 +1761,10 @@ mod tests {
     }
 
     #[test]
-    fn el_parche_limpio_es_vacio_y_el_choque_es_both() {
+    fn el_parche_limpio_es_verdadero_y_el_choque_es_both() {
         assert_eq!(
             judge_patch(SourceLanguage::Rust, "", "fn beta() {}\n"),
-            BelnapValue::Neither
+            BelnapValue::True
         );
         assert_eq!(
             judge_patch(SourceLanguage::Rust, "fn alpha() {}\n", "fn alpha() {}\n"),
@@ -1730,5 +1786,16 @@ mod tests {
             ),
             BelnapValue::Both
         );
+    }
+
+    #[test]
+    fn una_raiz_desconocida_deja_el_parche_en_vacio() {
+        assert_eq!(
+            judge_patch(SourceLanguage::Unknown, "", "זזז\n"),
+            BelnapValue::Neither
+        );
+        let reason = shoresh_unverified_reason("זזז\n").expect("motivo");
+        assert!(reason.contains("propuesta no verificada"));
+        assert!(shoresh_unverified_reason("ברא\n").is_none());
     }
 }
