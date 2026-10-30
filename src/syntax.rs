@@ -1797,11 +1797,9 @@ mod tests {
             BelnapValue::Neither
         );
         let reason = shoresh_unverified_reason("זזז\n");
-        assert!(
-            reason
-                .as_deref()
-                .is_some_and(|text| text.contains("propuesta no verificada"))
-        );
+        assert!(reason
+            .as_deref()
+            .is_some_and(|text| text.contains("propuesta no verificada")));
         assert!(shoresh_unverified_reason("ברא\n").is_none());
     }
 }
