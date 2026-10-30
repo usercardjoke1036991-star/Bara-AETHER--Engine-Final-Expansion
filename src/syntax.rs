@@ -1796,8 +1796,12 @@ mod tests {
             judge_patch(SourceLanguage::Unknown, "", "זזז\n"),
             BelnapValue::Neither
         );
-        let reason = shoresh_unverified_reason("זזז\n").expect("motivo");
-        assert!(reason.contains("propuesta no verificada"));
+        let reason = shoresh_unverified_reason("זזז\n");
+        assert!(
+            reason
+                .as_deref()
+                .is_some_and(|text| text.contains("propuesta no verificada"))
+        );
         assert!(shoresh_unverified_reason("ברא\n").is_none());
     }
 }
