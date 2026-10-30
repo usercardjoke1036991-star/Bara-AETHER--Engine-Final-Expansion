@@ -242,10 +242,8 @@ pub fn shoresh_unverified_reason(patch: &str) -> Option<String> {
             }
             // Signos que el lexer conserva sin juicio: no forman parte de la
             // sintaxis *Shoresh* reconocida (operadores tipados arriba).
-            TokenKind::Punct(symbol) => {
-                if !odd_symbols.contains(&symbol) {
-                    odd_symbols.push(symbol);
-                }
+            TokenKind::Punct(symbol) if !odd_symbols.contains(&symbol) => {
+                odd_symbols.push(symbol);
             }
             _ => {}
         }
@@ -260,7 +258,11 @@ pub fn shoresh_unverified_reason(patch: &str) -> Option<String> {
     // Sólo cuando el bloque habla Shoresh (hay raíces) los signos sueltos
     // cuentan: un parche Rust/ASCII puro no se marca por `{` o `(`.
     if saw_root && !odd_symbols.is_empty() {
-        let list: String = odd_symbols.iter().map(|ch| ch.to_string()).collect::<Vec<_>>().join(" ");
+        let list: String = odd_symbols
+            .iter()
+            .map(|ch| ch.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
         return Some(format!(
             "propuesta no verificada: símbolos no reconocidos por el lexer ({list})"
         ));
