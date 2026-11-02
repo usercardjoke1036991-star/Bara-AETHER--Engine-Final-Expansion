@@ -891,7 +891,7 @@ impl Lowering {
                 "disyunción + (join por carril)".to_string(),
                 None,
             ),
-            TokenKind::Newline | TokenKind::Eof => {}
+            TokenKind::Newline | TokenKind::Eof | TokenKind::Diagnostic { .. } => {}
             other => self.emit(MetalOpcode::Move, format!("{}", other), None),
         }
     }

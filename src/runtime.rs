@@ -1182,7 +1182,7 @@ impl BaraRuntime {
             TokenKind::Bang | TokenKind::Question => self.collapse(),
             TokenKind::Star => self.binary(false),
             TokenKind::Plus => self.binary(true),
-            TokenKind::Newline | TokenKind::Eof => {}
+            TokenKind::Newline | TokenKind::Eof | TokenKind::Diagnostic { .. } => {}
             _ => {}
         }
     }
