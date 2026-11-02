@@ -122,19 +122,80 @@ fn lexer_is_total_folding_niqqud_and_tolerating_junk() {
         }
     );
 
-    // Raíces de dos consonantes no son válidas: se degradan sin pánico.
+    // Raíces de dos consonantes no son válidas: diagnóstico, sin pánico.
     let short = Lexer::new("אב").tokenize();
-    assert_eq!(
-        short[0].kind,
-        TokenKind::Root {
-            letters: "אב".to_string(),
-            keyword: None,
+    match &short[0].kind {
+        TokenKind::Diagnostic { message } => {
+            assert!(
+                message.contains("3 consonantes"),
+                "mensaje inesperado: {message}"
+            );
         }
-    );
+        other => panic!("esperaba Diagnostic por raíz ≠3, obtuve {other:?}"),
+    }
 
-    // Basura radical: jamás un error, sólo símbolos tolerados.
-    let junk = Lexer::new("💥 𐤀 \u{0} \"sin cerrar\"").tokenize();
+    // Basura radical: total (llega a Eof); comilla abierta sin cierre ⇒ diagnóstico.
+    let junk = Lexer::new("💥 𐤀 \u{0} \"sin cerrar").tokenize();
     assert!(junk.iter().any(|token| token.kind == TokenKind::Eof));
+    assert!(
+        junk.iter().any(|token| matches!(
+            &token.kind,
+            TokenKind::Diagnostic { message } if message.contains("cadena sin cerrar")
+        )),
+        "cadena sin cerrar debe emitir Diagnostic"
+    );
+}
+
+#[test]
+fn lexer_b9_unterminated_string_does_not_swallow_rest() {
+    let tokens = Lexer::new("\"hola\nברא").tokenize();
+    let diag = tokens
+        .iter()
+        .find(|t| matches!(&t.kind, TokenKind::Diagnostic { message } if message.contains("cadena sin cerrar")))
+        .expect("diagnóstico de cadena sin cerrar");
+    assert_eq!(diag.line, 1);
+    assert!(
+        tokens.iter().any(|t| matches!(
+            &t.kind,
+            TokenKind::Root { letters, keyword }
+                if letters == "ברא" && *keyword == Some(Keyword::Manifest)
+        )),
+        "el resto del archivo tras el salto debe seguir tokenizándose"
+    );
+}
+
+#[test]
+fn lexer_b9_invalid_number_is_diagnostic_not_zero() {
+    let tokens = Lexer::new("1.2.3").tokenize();
+    match &tokens[0].kind {
+        TokenKind::Diagnostic { message } => {
+            assert!(
+                message.contains("número inválido"),
+                "mensaje inesperado: {message}"
+            );
+        }
+        TokenKind::Number(n) => panic!("no debe degradar a Number({n})"),
+        other => panic!("esperaba Diagnostic, obtuve {other:?}"),
+    }
+}
+
+#[test]
+fn lexer_b9_root_must_be_exactly_three_letters() {
+    let four = Lexer::new("אבגד").tokenize();
+    match &four[0].kind {
+        TokenKind::Diagnostic { message } => {
+            assert!(message.contains("3 consonantes"), "{message}");
+        }
+        other => panic!("4 consonantes ⇒ Diagnostic, no {other:?}"),
+    }
+    let ok = Lexer::new("שפט").tokenize();
+    match &ok[0].kind {
+        TokenKind::Root { letters, keyword } => {
+            assert_eq!(letters, "שפט");
+            assert_eq!(*keyword, Some(Keyword::Judge));
+        }
+        other => panic!("3 consonantes válidas ⇒ Root, no {other:?}"),
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────

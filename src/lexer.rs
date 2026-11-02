@@ -12,9 +12,11 @@
 //! * Las raíces desconocidas **no** producen error: se emiten como
 //!   [`TokenKind::Root`] sin [`Keyword`] asociada, y el runtime se encarga
 //!   de sintetizar su axioma (autopoiesis).
+//! * Longitud ≠ 3, número inválido o cadena sin cerrar →
+//!   [`TokenKind::Diagnostic`] (aviso con posición). **Sin panic.**
 //!
-//! El lexer es **totalmente infalible**: jamás rechaza su entrada. Aquello
-//! que no comprende lo degrada a un símbolo genérico en lugar de abortar.
+//! El lexer es **total**: jamás aborta ni hace `unwrap` sobre la entrada.
+//! Los problemas léxicos se materializan como diagnósticos tokenizados.
 
 use std::fmt;
 
@@ -114,6 +116,12 @@ pub enum TokenKind {
     Newline,
     /// Fin de entrada.
     Eof,
+    /// Aviso léxico (cadena sin cerrar, número inválido, raíz ≠ 3, …).
+    /// El lexer sigue siendo total: emite el diagnóstico y continúa.
+    Diagnostic {
+        /// Mensaje estable en español, apto para IDE/tests.
+        message: String,
+    },
 }
 
 /// Un token con su ubicación física en la fuente.
@@ -159,6 +167,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Punct(c) => write!(f, "Punct({})", c),
             TokenKind::Newline => write!(f, "Newline"),
             TokenKind::Eof => write!(f, "Eof"),
+            TokenKind::Diagnostic { message } => write!(f, "Diagnostic({})", message),
         }
     }
 }
@@ -182,7 +191,8 @@ impl Lexer {
         }
     }
 
-    /// Tokeniza por completo la fuente. **Nunca falla.**
+    /// Tokeniza por completo la fuente. **Nunca paniquea**; puede emitir
+    /// [`TokenKind::Diagnostic`].
     pub fn tokenize(mut self) -> Vec<Token> {
         let mut tokens = Vec::new();
         while let Some(token) = self.next_token() {
@@ -257,6 +267,8 @@ impl Lexer {
     }
 
     /// Lee una raíz: acumula consonantes y descarta los signos diacríticos.
+    /// Exactamente **3** consonantes hebreas ⇒ [`TokenKind::Root`]; si no,
+    /// [`TokenKind::Diagnostic`].
     fn read_root(&mut self, line: usize, column: usize) -> Token {
         let mut letters = String::new();
         while let Some(c) = self.peek() {
@@ -269,6 +281,18 @@ impl Lexer {
             } else {
                 break;
             }
+        }
+        let count = letters.chars().count();
+        if count != 3 {
+            return Token {
+                kind: TokenKind::Diagnostic {
+                    message: format!(
+                        "raíz debe tener exactamente 3 consonantes (encontradas {count})"
+                    ),
+                },
+                line,
+                column,
+            };
         }
         let keyword = Keyword::from_root(&letters);
         Token {
@@ -288,11 +312,21 @@ impl Lexer {
                 break;
             }
         }
-        let value = buf.parse::<f64>().unwrap_or(0.0);
-        Token {
-            kind: TokenKind::Number(value),
-            line,
-            column,
+        // Sin unwrap_or(0.0): parse fallido o forma ambigua ⇒ diagnóstico.
+        let dots = buf.chars().filter(|c| *c == '.').count();
+        match buf.parse::<f64>() {
+            Ok(value) if dots <= 1 && !buf.ends_with('.') => Token {
+                kind: TokenKind::Number(value),
+                line,
+                column,
+            },
+            _ => Token {
+                kind: TokenKind::Diagnostic {
+                    message: format!("número inválido ({buf})"),
+                },
+                line,
+                column,
+            },
         }
     }
 
@@ -316,16 +350,22 @@ impl Lexer {
     fn read_string(&mut self, line: usize, column: usize) -> Token {
         self.bump(); // comilla de apertura
         let mut buf = String::new();
+        let mut closed = false;
         while let Some(c) = self.peek() {
             match c {
                 '"' => {
                     self.bump();
+                    closed = true;
                     break;
                 }
+                // No tragar el resto del archivo: el salto queda para el
+                // siguiente token; se emite diagnóstico de cadena abierta.
+                '\n' => break,
                 '\\' => {
                     self.bump();
-                    if let Some(esc) = self.bump() {
-                        buf.push(esc);
+                    match self.bump() {
+                        Some(esc) => buf.push(esc),
+                        None => break, // escape truncado ⇒ sin cerrar
                     }
                 }
                 _ => {
@@ -333,6 +373,15 @@ impl Lexer {
                     self.bump();
                 }
             }
+        }
+        if !closed {
+            return Token {
+                kind: TokenKind::Diagnostic {
+                    message: "cadena sin cerrar".to_string(),
+                },
+                line,
+                column,
+            };
         }
         Token {
             kind: TokenKind::Str(buf),
@@ -385,4 +434,37 @@ fn is_hebrew_mark(c: char) -> bool {
 /// ¿Es un apóstrofo hebreo (geresh `׳` / gershayim `״`)?
 fn is_geresh(c: char) -> bool {
     matches!(c as u32, 0x05F3 | 0x05F4)
+}
+
+#[cfg(test)]
+mod b9_tests {
+    use super::*;
+
+    #[test]
+    fn unterminated_string_diagnostic() {
+        let tokens = Lexer::new("\"abc").tokenize();
+        assert!(matches!(
+            &tokens[0].kind,
+            TokenKind::Diagnostic { message } if message == "cadena sin cerrar"
+        ));
+    }
+
+    #[test]
+    fn invalid_number_no_zero_fallback() {
+        let tokens = Lexer::new("1.2.3").tokenize();
+        assert!(matches!(
+            &tokens[0].kind,
+            TokenKind::Diagnostic { message } if message.contains("número inválido")
+        ));
+        assert!(!matches!(&tokens[0].kind, TokenKind::Number(_)));
+    }
+
+    #[test]
+    fn root_not_three_letters() {
+        let tokens = Lexer::new("אב").tokenize();
+        assert!(matches!(
+            &tokens[0].kind,
+            TokenKind::Diagnostic { message } if message.contains("3 consonantes")
+        ));
+    }
 }

@@ -2,6 +2,7 @@
 name = "bara"
 version = "0.5.0"
 edition = "2021"
+rust-version = "1.99"
 description = "Bara (בָּרָא) — El Lenguaje de Programación Supremo Trascendental"
 license = "MIT"
 repository = "https://github.com/usercardjoke1036991-star/Bara-AETHER--Engine-Final-Expansion"

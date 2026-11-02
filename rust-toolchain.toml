@@ -1,0 +1,4 @@
+# MSRV alineado al CI (dtolnay/rust-toolchain → 1.99.0).
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
